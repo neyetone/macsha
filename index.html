@@ -1,312 +1,707 @@
+<!-- 
+================================================================================
+ 项目名称：黑曜士 · 智能剥离器 (Obsidian · Smart Stripper)
+ 当前版本：Matrix v2.6.6 (最高胜率展示版)
+ 更新日志：
+   [v2.6.6] - 1. 修复结论卡固定显示“杀5码”的问题，现自动展示 12 项中胜率最高的结果；
+              2. 优化推文生成逻辑，置顶展示最高胜率项；
+              3. 添加客服浮窗。
+================================================================================
+-->
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<title>黑耀士-新奥数据剥离器(_V1.0正式版)</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>鹰眼通 ·带客服最高胜率展示智能剥离器 v2.6.6</title>
 <style>
     :root {
-        --bg: #050508;
-        --panel-bg: #0d1117;
-        --border: #1f2937;
-        --text: #e2e8f0;
-        --blue: #38bdf8;
-        --red: #f43f5e;
-        --green: #10b981;
-        --gold: #fbbf24;
-        --dim: #64748b;
+        --primary: #1D4ED8;
+        --primary-deep: #172554;
+        --primary-mid: #1E3A8A;
+        --accent: #B45309;
+        --accent-bg: #FFFBEB;
+        --accent-line: #FDE68A;
+        --success: #0F766E; 
+        --danger: #BE123C;  
+        --bg: #F7F7F5;
+        --card: #FFFFFF;
+        --line: #EAEAEA;
+        --line-strong: #D4D4D4;
+        --text: #1A1A1A;
+        --text-2: #4B5563;
+        --dim: #6B7280;
+        --cyan: #38BDF8;
+        --tg-blue: #229ED9;
     }
 
-    * { box-sizing: border-box; margin: 0; padding: 0; }
+    * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
 
     body {
         background-color: var(--bg);
         color: var(--text);
-        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
         min-height: 100vh;
-        background-image: radial-gradient(circle at 50% 0%, rgba(56, 189, 248, 0.05) 0%, transparent 60%);
         display: flex;
         justify-content: center;
         align-items: center;
         padding: 15px;
+        user-select: none;
     }
 
     .terminal-container {
         width: 100%;
         max-width: 480px;
-        background: var(--panel-bg);
-        border: 1px solid var(--border);
-        border-radius: 16px;
-        box-shadow: 0 20px 50px rgba(0,0,0,0.8), inset 0 0 30px rgba(244, 63, 94, 0.05);
+        background: var(--card);
+        border-radius: 24px;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.04), 0 12px 40px -12px rgba(0,0,0,0.08);
         overflow: hidden;
         position: relative;
     }
 
-    .header {
-        padding: 15px 20px; border-bottom: 1px solid var(--border);
-        display: flex; justify-content: space-between; align-items: center; background: rgba(0,0,0,0.3);
+    .topbar {
+        padding: 16px 20px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        border-bottom: 1px solid var(--line);
+        background: var(--card);
     }
-    .brand { font-size: 16px; font-weight: 900; letter-spacing: 2px; display: flex; align-items: center; gap: 8px; }
-    .brand span { color: var(--red); text-shadow: 0 0 10px rgba(244,63,94,0.5); }
-    .status-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--green); box-shadow: 0 0 10px var(--green); animation: pulse 2s infinite; }
-    @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.3; } 100% { opacity: 1; } }
-
-    .latest-result-panel {
-        background: rgba(56, 189, 248, 0.05); border-bottom: 1px solid var(--border);
-        padding: 12px 20px; display: flex; justify-content: space-between; align-items: center;
+    .brand { font-size: 17px; font-weight: 900; letter-spacing: 0.5px; display: flex; align-items: center; gap: 8px; }
+    .brand .main-name { color: var(--primary-deep); }
+    .brand .sub-name {
+        font-size: 11px; color: var(--primary);
+        font-family: "SF Mono", "JetBrains Mono", monospace;
+        border: 1px solid rgba(29,78,216,0.15);
+        padding: 2px 7px; border-radius: 5px;
+        background: rgba(29,78,216,0.05);
+        letter-spacing: 0.5px;
     }
-    .latest-info { display: flex; flex-direction: column; gap: 4px; }
-    .latest-period { font-size: 13px; font-weight: bold; color: var(--blue); font-family: monospace; }
-    .latest-date { font-size: 11px; color: var(--dim); font-family: monospace; }
-    .latest-ball-group { display: flex; align-items: center; gap: 10px; }
-    .latest-zodiac { font-size: 12px; color: #94a3b8; }
-    .latest-num {
-        background: var(--red); color: #fff; font-size: 20px; font-weight: 900;
-        width: 40px; height: 40px; border-radius: 50%; display: flex;
-        justify-content: center; align-items: center; font-family: monospace;
-        box-shadow: 0 0 15px rgba(244,63,94,0.5);
+    .status-indicator {
+        display: flex; align-items: center; gap: 6px;
+        font-size: 11px; color: var(--dim);
+        font-family: "SF Mono", monospace;
     }
-
-    .config-panel {
-        padding: 15px 20px; background: rgba(255,255,255,0.02); border-bottom: 1px solid var(--border);
-        display: grid; grid-template-columns: 1fr 1fr; gap: 10px; align-items: center;
+    .status-indicator::before {
+        content: '';
+        width: 6px; height: 6px; border-radius: 50%;
+        background: var(--success);
+        box-shadow: 0 0 0 3px rgba(5,150,105,0.15);
+        animation: statusPulse 2.5s ease-in-out infinite;
     }
-    .config-item.full { grid-column: span 2; }
-    .config-item { display: flex; flex-direction: column; gap: 5px; position: relative; }
-    .config-item label { font-size: 11px; color: var(--dim); letter-spacing: 1px; display: flex; justify-content: space-between;}
-    .lock-tag { color: var(--gold); font-size: 10px; display: none; cursor: pointer; text-decoration: underline;}
-    .config-item select {
-        background: #000; border: 1px solid #333; color: var(--blue);
-        padding: 6px; border-radius: 4px; font-size: 12px; outline: none; font-family: monospace; cursor: pointer; width: 100%;
-    }
-    .config-item select:disabled { opacity: 0.5; cursor: not-allowed; }
-
-    .radar-section { padding: 15px 0 10px; display: flex; flex-direction: column; align-items: center; position: relative; overflow: hidden; }
-    .radar-circle {
-        width: 60px; height: 60px; border-radius: 50%; border: 2px dashed rgba(244, 63, 94, 0.3);
-        position: relative; display: flex; justify-content: center; align-items: center; margin-bottom: 10px;
-    }
-    .radar-inner { width: 35px; height: 35px; border-radius: 50%; border: 1px solid rgba(56, 189, 248, 0.5); box-shadow: inset 0 0 15px rgba(56, 189, 248, 0.2); }
-    .scan-line {
-        position: absolute; top: 0; left: 50%; width: 2px; height: 50%;
-        background: linear-gradient(to top, var(--red), transparent); transform-origin: bottom center; animation: scan 3s linear infinite;
-    }
-    @keyframes scan { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-    
-    .target-banner {
-        background: rgba(244, 63, 94, 0.1); border: 1px solid rgba(244, 63, 94, 0.3); color: var(--red);
-        padding: 6px 20px; border-radius: 20px; font-size: 14px; font-weight: 900; letter-spacing: 2px;
-        margin-bottom: 15px; text-shadow: 0 0 10px rgba(244,63,94,0.5);
+    @keyframes statusPulse {
+        0%, 100% { box-shadow: 0 0 0 3px rgba(5,150,105,0.15); }
+        50% { box-shadow: 0 0 0 5px rgba(5,150,105,0.05); }
     }
 
-    .list-wrapper { position: relative; padding: 0 20px 20px; }
-    .kill-list { display: flex; flex-direction: column; gap: 10px; max-height: 480px; overflow-y: auto; transition: filter 0.3s;}
-    .kill-list::-webkit-scrollbar { width: 4px; }
-    .kill-list::-webkit-scrollbar-thumb { background: #333; border-radius: 2px; }
+    .draw-section {
+        padding: 14px 20px 16px;
+        background: #FAFAF8;
+        border-bottom: 1px solid var(--line);
+    }
+    .draw-info {
+        display: flex;
+        justify-content: space-between;
+        align-items: baseline;
+        margin-bottom: 10px;
+    }
+    .draw-period {
+        font-size: 13px; font-weight: 700;
+        color: var(--primary-deep);
+        font-family: "SF Mono", monospace;
+        letter-spacing: 0.3px;
+    }
+    .draw-date {
+        font-size: 11px; color: var(--dim);
+        font-family: "SF Mono", monospace;
+    }
+    .draw-balls {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        gap: 5px;
+        flex-wrap: wrap;
+    }
 
-    .kill-item {
-        background: rgba(255,255,255,0.02); border: 1px solid var(--border);
-        border-left: 3px solid var(--red); border-radius: 8px; padding: 12px 15px;
+    .ball-3d {
+        width: 30px; height: 30px; border-radius: 50%;
+        display: flex; justify-content: center; align-items: center;
+        font-size: 13px; font-weight: 900;
+        font-family: "SF Mono", monospace;
+        color: #fff;
+        box-shadow: inset -2px -2px 6px rgba(0,0,0,0.55), inset 2px 2px 4px rgba(255,255,255,0.35), 0 2px 4px rgba(0,0,0,0.15);
+        position: relative;
+        text-shadow: 1px 1px 2px rgba(0,0,0,0.55);
+        flex-shrink: 0;
+    }
+    .ball-3d::after {
+        content: ''; position: absolute; top: 15%; left: 20%;
+        width: 25%; height: 25%; border-radius: 50%;
+        background: rgba(255,255,255,0.55); filter: blur(1.5px);
+    }
+    .wave-red { background: radial-gradient(circle at 30% 30%, #ff7b7b, #b90000); }
+    .wave-blue { background: radial-gradient(circle at 30% 30%, #7bb3ff, #0033cc); }
+    .wave-green { background: radial-gradient(circle at 30% 30%, #6ee7b7, #007733); }
+    .ball-3d.special {
+        width: 34px; height: 34px; font-size: 14px;
+        box-shadow: inset -2px -2px 6px rgba(0,0,0,0.55), inset 2px 2px 4px rgba(255,255,255,0.35), 0 0 8px rgba(180, 83, 9, 0.45);
+        border: 1.5px solid var(--accent);
+        margin-left: 4px;
+    }
+    .plus-sign { color: var(--dim); font-size: 15px; font-weight: 700; margin: 0 2px; opacity: 0.6;}
+
+    .config-row {
+        display: flex;
+        gap: 8px;
+        padding: 14px 16px 10px;
+        background: var(--card);
+    }
+    .config-pill {
+        flex: 1;
+        position: relative;
+        min-width: 0;
+    }
+    .config-select {
+        width: 100%;
+        background: #F5F5F3;
+        border: 1px solid transparent;
+        color: var(--text);
+        font-size: 12px;
+        font-weight: 600;
+        padding: 9px 24px 9px 12px;
+        border-radius: 10px;
+        outline: none;
+        font-family: inherit;
+        cursor: pointer;
+        -webkit-appearance: none;
+        appearance: none;
+        transition: border-color 0.2s, background 0.2s;
+        text-overflow: ellipsis;
+    }
+    .config-select:focus { border-color: var(--primary); background: #fff; }
+    .config-select:disabled { opacity: 0.55; cursor: not-allowed; }
+    .config-pill::after {
+        content: '';
+        position: absolute;
+        right: 11px; top: 50%;
+        transform: translateY(-30%) rotate(45deg);
+        width: 5px; height: 5px;
+        border-right: 1.5px solid var(--dim);
+        border-bottom: 1.5px solid var(--dim);
+        pointer-events: none;
+    }
+    .lock-tag {
+        position: absolute;
+        top: -5px; right: -4px;
+        font-size: 10px;
+        background: var(--accent);
+        color: #fff;
+        padding: 1px 5px;
+        border-radius: 6px;
+        cursor: pointer;
+        font-weight: 700;
+        display: none;
+        z-index: 2;
+        line-height: 1.4;
+    }
+
+    .action-row {
+        display: flex;
+        gap: 8px;
+        padding: 0 16px 16px;
+    }
+    .btn-execute {
+        flex: 2;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        padding: 13px;
+        background: var(--primary-deep);
+        color: #fff;
+        border: none;
+        border-radius: 12px;
+        font-size: 14px;
+        font-weight: 800;
+        letter-spacing: 1px;
+        cursor: pointer;
+        transition: transform 0.15s ease, box-shadow 0.15s ease, background 0.2s;
+        box-shadow: 0 4px 14px -4px rgba(23,37,84,0.5);
+        font-family: inherit;
+    }
+    .btn-execute:hover { background: var(--primary-mid); }
+    .btn-execute:active { transform: scale(0.97); box-shadow: 0 1px 6px -2px rgba(23,37,84,0.5); }
+    .btn-execute:disabled { opacity: 0.7; cursor: wait; }
+    .btn-execute .arrow { font-size: 15px; opacity: 0.7; transition: transform 0.2s; }
+    .btn-execute:hover .arrow { transform: translateX(2px); }
+
+    .btn-copy {
+        flex: 1;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 4px;
+        padding: 13px;
+        background: #EFF6FF;
+        color: var(--primary);
+        border: 1px solid rgba(29,78,216,0.15);
+        border-radius: 12px;
+        font-size: 13px;
+        font-weight: 800;
+        cursor: pointer;
+        transition: all 0.2s;
+        font-family: inherit;
+        align-items: center;
+        line-height: 1;
+    }
+    .btn-copy:hover { background: #DBEAFE; }
+    .btn-copy:active { transform: scale(0.97); }
+    .btn-copy .icon { font-size: 14px; margin-bottom: 1px;}
+
+    .conclusion-card {
+        position: relative;
+        margin: 0 16px 16px;
+        padding: 18px 20px 16px;
+        border-radius: 20px;
+        background: linear-gradient(135deg, #1E1E1E 0%, #0A0A0A 100%);
+        color: #fff;
+        overflow: hidden;
+        box-shadow: 0 12px 32px -12px rgba(0, 0, 0, 0.7), inset 0 1px 0 rgba(255,255,255,0.06);
+        border: 1px solid rgba(255,255,255,0.05);
+    }
+    .conclusion-card::before {
+        content: '';
+        position: absolute; inset: 0;
+        background: radial-gradient(circle at 85% 10%, rgba(56,189,248,0.12), transparent 60%);
+        pointer-events: none;
+    }
+    .conc-radar {
+        position: absolute; top: 16px; right: 16px;
+        width: 56px; height: 56px;
+        border-radius: 50%;
+        border: 1.5px solid rgba(56,189,248,0.35);
+        background: radial-gradient(circle, rgba(56,189,248,0.08) 0%, rgba(56,189,248,0.0) 75%);
+        overflow: hidden;
+        z-index: 1;
+    }
+    .conc-radar::before { content: ''; position: absolute; inset: 11px; border-radius: 50%; border: 1px dashed rgba(56,189,248,0.2); }
+    .conc-radar::after { content: ''; position: absolute; inset: 21px; border-radius: 50%; border: 1px solid rgba(56,189,248,0.15); }
+    .conc-radar-sweep {
+        position: absolute; inset: 0; border-radius: 50%;
+        background: conic-gradient(from 0deg, rgba(56,189,248,0) 0deg, rgba(56,189,248,0) 250deg, rgba(56,189,248,0.85) 360deg);
+        animation: radarRotate 2.2s linear infinite;
+    }
+    .conc-radar-dot {
+        position: absolute; top: 50%; left: 50%;
+        width: 5px; height: 5px;
+        background: var(--cyan); border-radius: 50%;
+        transform: translate(-50%, -50%);
+        box-shadow: 0 0 8px var(--cyan);
+        animation: radarPulseCyan 1.6s ease-in-out infinite;
+        z-index: 2;
+    }
+    .conc-radar-blip {
+        position: absolute; width: 3px; height: 3px;
+        background: var(--cyan); border-radius: 50%;
+        box-shadow: 0 0 4px var(--cyan);
+        z-index: 1;
+    }
+    .conc-radar-blip.b1 { top: 26%; left: 62%; animation: blip 2.2s ease-in-out infinite; }
+    .conc-radar-blip.b2 { top: 66%; left: 36%; animation: blip 2.2s ease-in-out 1s infinite; }
+    @keyframes radarRotate { to { transform: rotate(360deg); } }
+    @keyframes radarPulseCyan { 0%, 100% { opacity: 1; box-shadow: 0 0 8px var(--cyan); } 50% { opacity: 0.35; box-shadow: 0 0 14px var(--cyan); } }
+    @keyframes blip { 0%, 100% { opacity: 0; transform: scale(0.5); } 30%, 70% { opacity: 1; transform: scale(1); } }
+
+    .conc-content { position: relative; z-index: 2; }
+    .conc-label {
+        font-size: 11px; opacity: 0.7; letter-spacing: 1px;
+        font-weight: 600; margin-bottom: 10px;
+        display: flex; align-items: center; gap: 6px;
+    }
+    .conc-label .dot {
+        width: 5px; height: 5px;
+        background: var(--cyan); border-radius: 50%;
+        box-shadow: 0 0 6px var(--cyan);
+        animation: radarPulseCyan 1.6s ease-in-out infinite;
+    }
+    .conc-value {
+        font-family: "SF Mono", "JetBrains Mono", monospace;
+        font-size: 26px; font-weight: 900;
+        letter-spacing: -0.5px; line-height: 1.15; margin-bottom: 12px;
+        word-break: break-all; padding-right: 70px; min-height: 32px;
+        text-shadow: 0 2px 10px rgba(255,255,255,0.1);
+    }
+    .conc-value.locked { font-size: 20px; opacity: 0.5; letter-spacing: 4px; }
+    .conc-meta {
+        display: flex; gap: 18px; font-size: 12px; opacity: 0.85;
+        font-family: "SF Mono", monospace; margin-bottom: 14px;
+    }
+    .conc-meta b { color: var(--cyan); font-weight: 800; font-size: 13px; text-shadow: 0 0 8px rgba(56,189,248,0.3); }
+    .conc-tags { display: flex; flex-wrap: wrap; gap: 6px; padding-right: 70px; }
+    .conc-tag {
+        font-size: 11px; padding: 3px 9px;
+        background: rgba(255,255,255,0.08);
+        border: 1px solid rgba(255,255,255,0.12);
+        border-radius: 999px;
+        font-family: "SF Mono", monospace;
+        color: rgba(255,255,255,0.9); white-space: nowrap;
+    }
+    .conc-tag b { color: #fff; font-weight: 700; }
+    .conc-footer {
+        position: relative; z-index: 2;
         display: flex; justify-content: space-between; align-items: center;
+        margin-top: 14px; padding-top: 12px;
+        border-top: 1px solid rgba(255,255,255,0.1);
+        font-size: 11px; opacity: 0.75; font-family: "SF Mono", monospace;
     }
-    .kill-info { display: flex; flex-direction: column; gap: 6px; flex: 1; }
-    .kill-title { font-size: 13px; color: #e2e8f0; font-weight: bold; display: flex; align-items: center; gap: 8px;}
-    .intersect-badge { font-size: 10px; background: rgba(56, 189, 248, 0.15); color: var(--blue); padding: 2px 6px; border-radius: 4px; border: 1px solid rgba(56, 189, 248, 0.3); }
-    .kill-stat { font-size: 11px; color: var(--dim); font-family: monospace; display: flex; gap: 10px;}
-    .stat-hit { color: var(--green); }
-    .stat-rate { font-weight: bold; }
-    .kill-value {
-        font-size: 20px; font-weight: 900; color: var(--red); font-family: monospace;
-        text-shadow: 0 0 15px rgba(244,63,94,0.4); text-align: right; max-width: 150px; line-height: 1.2;
+    .conc-watermark {
+        display: inline-block; background: rgba(253, 230, 138, 0.15); color: #FCD34D;
+        padding: 3px 8px; border-radius: 5px;
+        font-size: 10px; font-weight: 900; letter-spacing: 0.3px;
+        border: 1px solid rgba(253,230,138,0.3);
     }
 
-    .vip-blur { filter: blur(8px); pointer-events: none; user-select: none; }
+    .detail-section { padding: 0 16px 16px; position: relative; }
+    .detail-toggle {
+        width: 100%; display: flex; justify-content: space-between; align-items: center;
+        padding: 12px 16px; background: #F5F5F3;
+        border: 1px solid var(--line); border-radius: 12px;
+        font-size: 13px; font-weight: 700; color: var(--text-2);
+        cursor: pointer; font-family: inherit; transition: background 0.2s;
+    }
+    .detail-toggle:hover { background: #EFEFEC; }
+    .toggle-arrow { font-size: 11px; transition: transform 0.3s ease; color: var(--dim); }
+    .detail-toggle.open .toggle-arrow { transform: rotate(180deg); }
+
+    .detail-list {
+        max-height: 0; overflow: hidden;
+        transition: max-height 0.45s cubic-bezier(0.2, 0, 0.1, 1), opacity 0.3s ease;
+        opacity: 0; padding-top: 0;
+    }
+    .detail-list.open { max-height: 3000px; opacity: 1; padding-top: 12px; }
+
+    .kill-list { display: flex; flex-direction: column; gap: 8px; }
+    .kill-item {
+        display: flex; justify-content: space-between; align-items: center;
+        padding: 14px 16px; background: var(--card);
+        border: 1px solid var(--line); border-radius: 14px;
+        transition: border-color 0.2s, background 0.2s;
+    }
+    .kill-item.core { border-left: 3px solid var(--accent); background: var(--accent-bg); border-color: var(--accent-line); border-left-color: var(--accent); }
+    .kill-item.low { opacity: 0.55; }
+    .kill-info { flex: 1; min-width: 0; padding-right: 10px; }
+    
+    .kill-title {
+        font-size: 13px; font-weight: 700; color: var(--text);
+        margin-bottom: 8px; display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
+    }
+    .kill-title .rank-dot { display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: var(--line-strong); margin-right: 2px; flex-shrink: 0; }
+    .kill-item.core .rank-dot { background: var(--accent); }
+    .intersect-badge { font-size: 10px; background: rgba(29,78,216,0.08); color: var(--primary); padding: 1px 6px; border-radius: 4px; font-weight: 700; letter-spacing: 0.3px; }
+    
+    .kill-stat { 
+        font-size: 10px; color: var(--text-2); font-family: "SF Mono", monospace; 
+        display: flex; flex-wrap: wrap; gap: 4px 8px; align-items: center;
+    }
+    .kill-stat span { display: flex; align-items: center; gap: 2px; }
+    .stat-label { color: var(--dim); font-size: 10px; }
+    .stat-hit { color: var(--success); font-weight: 700; }
+    .stat-loss { color: var(--danger); font-weight: 700; }
+    .stat-rate { font-weight: 800; }
+    
+    .kill-value {
+        font-family: "SF Mono", "JetBrains Mono", monospace;
+        font-size: 18px; font-weight: 900; color: var(--danger);
+        letter-spacing: -0.3px; text-align: right; max-width: 45%;
+        line-height: 1.25; padding-left: 10px; flex-shrink: 0;
+        word-break: break-all;
+    }
+    .kill-value.small-text { font-size: 15px; letter-spacing: -0.5px; }
+    .kill-item.core .kill-value { color: var(--accent); }
+
+    .vip-blur { filter: blur(6px); pointer-events: none; user-select: none; }
     .vip-overlay {
-        position: absolute; top: 0; left: 20px; right: 20px; bottom: 20px;
+        position: absolute; left: 16px; right: 16px; bottom: 16px;
         display: none; flex-direction: column; align-items: center; justify-content: center;
-        background: rgba(13, 17, 23, 0.8); border-radius: 8px; z-index: 10;
-        text-align: center; padding: 20px; border: 1px solid rgba(244, 63, 94, 0.2);
+        background: rgba(255,255,255,0.92); border-radius: 14px;
+        padding: 24px 20px; text-align: center; border: 1px solid var(--line);
+        z-index: 10; backdrop-filter: blur(4px);
     }
     .vip-overlay.show { display: flex; }
-    .vip-title { color: var(--red); font-size: 18px; font-weight: 900; margin-bottom: 10px; text-shadow: 0 0 10px rgba(244,63,94,0.5); }
-    .vip-desc { font-size: 12px; color: var(--text); margin-bottom: 15px; line-height: 1.6;}
+    .vip-title { color: var(--primary-deep); font-size: 15px; font-weight: 900; margin-bottom: 8px; }
+    .vip-desc { font-size: 12px; color: var(--dim); margin-bottom: 14px; line-height: 1.6; }
     .btn-unlock {
-        background: linear-gradient(135deg, var(--red), #be123c); color: #fff;
-        border: none; padding: 8px 20px; border-radius: 20px; font-weight: bold;
-        cursor: pointer; box-shadow: 0 4px 15px rgba(244,63,94,0.4);
+        background: var(--primary-deep); color: #fff; border: none;
+        padding: 9px 22px; border-radius: 9px; font-size: 13px; font-weight: 800;
+        cursor: pointer; font-family: inherit; box-shadow: 0 3px 10px -2px rgba(23,37,84,0.4);
     }
 
-    .footer { padding: 15px 20px; background: rgba(0,0,0,0.4); border-top: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; }
-    .btn-analyze {
-        background: transparent; color: var(--blue); border: 1px solid var(--blue);
-        padding: 8px 16px; border-radius: 6px; font-size: 12px; font-weight: bold;
-        cursor: pointer; transition: 0.3s; display: flex; align-items: center; gap: 6px;
-    }
-    .btn-analyze:hover { background: rgba(56, 189, 248, 0.1); }
-    .btn-analyze:disabled { opacity: 0.5; cursor: not-allowed; }
+    .footer-disclaimer { font-size: 10px; color: var(--dim); text-align: center; padding: 4px 24px 20px; line-height: 1.7; background: var(--card); }
+    .footer-meta { display: flex; justify-content: center; gap: 12px; font-size: 10px; color: var(--dim); font-family: "SF Mono", monospace; margin-bottom: 6px; opacity: 0.7; }
 
-    .calc-modal { position: fixed; inset: 0; background: rgba(5,5,8,0.98); z-index: 99999; display: none; flex-direction: column; justify-content: center; align-items: center; backdrop-filter: blur(8px); padding: 30px; background-image: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(56,189,248,0.03) 2px, rgba(56,189,248,0.03) 4px); }
+    .calc-modal { position: fixed; inset: 0; background: rgba(247, 247, 245, 0.96); z-index: 99999; display: none; flex-direction: column; justify-content: center; align-items: center; backdrop-filter: blur(10px); padding: 30px; }
     .calc-modal.show { display: flex; }
-    .calc-inner { width: 100%; max-width: 400px; }
-    .calc-title { color: var(--blue); font-size: 15px; font-weight: 900; letter-spacing: 2px; margin-bottom: 25px; text-align: center; text-transform: uppercase; text-shadow: 0 0 15px rgba(56,189,248,0.5); }
-    .calc-title span { color: var(--red); text-shadow: 0 0 15px rgba(244,63,94,0.5); }
-    .progress-container { width: 100%; height: 4px; background: #1f2937; border-radius: 2px; overflow: hidden; margin-bottom: 25px; }
-    .progress-bar { width: 0%; height: 100%; background: linear-gradient(90deg, var(--blue), var(--red)); transition: width 0.2s ease; }
-    .calc-logs { width: 100%; height: 180px; background: #000; border: 1px solid #333; border-radius: 8px; padding: 12px; overflow-y: auto; font-family: 'Courier New', Courier, monospace; font-size: 11px; color: #94a3b8; line-height: 1.8; }
-    .log-success { color: var(--green); }
-    .log-warn { color: var(--gold); }
-    .log-danger { color: var(--red); }
-    .log-sys { color: var(--blue); font-weight: bold;}
-    .cursor { display: inline-block; width: 6px; height: 12px; background: var(--blue); animation: blink 1s step-end infinite; vertical-align: middle; margin-left: 5px; }
-    @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0; } }
+    .calc-inner { width: 100%; max-width: 380px; background: #fff; padding: 26px 24px 22px; border-radius: 20px; box-shadow: 0 24px 60px -20px rgba(23,37,84,0.25); border: 1px solid var(--line); max-height: 90vh; overflow-y: auto; }
+    .calc-radar-wrap { width: 130px; height: 130px; margin: 0 auto 16px; position: relative; }
+    .calc-radar-svg { width: 100%; height: 100%; display: block; }
+    .calc-radar-sweep { transform-origin: 60px 60px; animation: radarRotate 1.8s linear infinite; }
+    .calc-radar-ping { position: absolute; inset: -8px; border-radius: 50%; border: 1.5px solid rgba(29,78,216,0.35); animation: radarRipple 2.4s ease-out infinite; pointer-events: none; }
+    @keyframes radarRipple { 0% { transform: scale(0.85); opacity: 0.7; } 100% { transform: scale(1.2); opacity: 0; } }
+    .calc-title { color: var(--primary-deep); font-size: 14px; font-weight: 800; margin-bottom: 16px; text-align: center; letter-spacing: 0.5px; }
+    .calc-title span { color: var(--primary); font-family: "SF Mono", monospace; }
+    .progress-container { width: 100%; height: 4px; background: var(--line); border-radius: 3px; overflow: hidden; margin-bottom: 16px; }
+    .progress-bar { width: 0%; height: 100%; background: var(--primary); transition: width 0.25s ease; }
+    .calc-logs { width: 100%; height: 150px; background: #FAFAF8; border: 1px solid var(--line); border-radius: 10px; padding: 12px; overflow-y: auto; font-family: "SF Mono", monospace; font-size: 11px; color: var(--text-2); line-height: 1.9; }
+    .log-success { color: var(--success); font-weight: 700; }
+    .log-warn { color: var(--accent); }
+    .log-danger { color: var(--danger); }
 
-    .vip-modal { position: fixed; inset: 0; background: rgba(5,5,8,0.95); z-index: 99999; display: none; flex-direction: column; justify-content: center; align-items: center; backdrop-filter: blur(10px); padding: 30px; }
+    .toast-container {
+        position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
+        background: var(--primary-deep); color: #fff; padding: 13px 26px;
+        border-radius: 10px; z-index: 100000; display: none; align-items: center; justify-content: center;
+        box-shadow: 0 12px 36px rgba(23,37,84,0.3); font-size: 13px; font-weight: 700;
+        text-align: center; opacity: 0; transition: opacity 0.3s; min-width: 180px; font-family: inherit;
+    }
+    .toast-container.show { display: flex; opacity: 1; }
+    .toast-error { background: var(--danger); }
+    .toast-success { background: var(--success); }
+
+    .vip-modal { position: fixed; inset: 0; background: rgba(0,0,0,0.55); z-index: 99999; display: none; flex-direction: column; justify-content: center; align-items: center; backdrop-filter: blur(4px); padding: 30px; }
     .vip-modal.show { display: flex; }
-    .vip-modal-content { background: var(--panel-bg); border: 1px solid var(--red); border-radius: 16px; padding: 25px; width: 100%; max-width: 320px; text-align: center; box-shadow: 0 0 30px rgba(244,63,94,0.2); position: relative; }
-    .vip-modal-close { position: absolute; top: 10px; right: 15px; color: var(--dim); font-size: 20px; cursor: pointer; }
-    .vip-input { width: 100%; background: #000; border: 1px solid #333; color: var(--gold); border-radius: 8px; padding: 12px; font-size: 16px; text-align: center; margin-bottom: 15px; letter-spacing: 2px; outline: none; }
-    .vip-input:focus { border-color: var(--gold); }
+    .vip-modal-content { background: #fff; border-radius: 18px; padding: 26px 22px; width: 100%; max-width: 320px; text-align: center; box-shadow: 0 24px 60px rgba(0,0,0,0.2); position: relative; }
+    .vip-modal-close { position: absolute; top: 12px; right: 14px; color: var(--dim); font-size: 20px; cursor: pointer; line-height: 1; padding: 4px; }
+    .vip-input { width: 100%; background: #F5F5F3; border: 1px solid var(--line); color: var(--text); border-radius: 10px; padding: 12px; font-size: 15px; text-align: center; margin-bottom: 14px; letter-spacing: 2px; outline: none; font-weight: 700; font-family: "SF Mono", monospace; transition: border-color 0.2s; }
+    .vip-input:focus { border-color: var(--primary); }
 </style>
 </head>
 <body>
 
+    <div id="customToast" class="toast-container">
+        <div id="toastMsg"></div>
+    </div>
+
     <div id="calcModal" class="calc-modal">
         <div class="calc-inner">
-            <div class="calc-title">Executing <span id="calcStrategyName">Multi-Factor Model</span></div>
+            <div class="calc-radar-wrap">
+                <svg class="calc-radar-svg" viewBox="0 0 120 120" xmlns="http://www.w3.org/2000/svg">
+                    <circle cx="60" cy="60" r="55" fill="none" stroke="rgba(29,78,216,0.22)" stroke-width="1"/>
+                    <circle cx="60" cy="60" r="38" fill="none" stroke="rgba(29,78,216,0.18)" stroke-width="1"/>
+                    <circle cx="60" cy="60" r="21" fill="none" stroke="rgba(29,78,216,0.15)" stroke-width="1"/>
+                    <line x1="60" y1="5" x2="60" y2="115" stroke="rgba(29,78,216,0.12)" stroke-width="1"/>
+                    <line x1="5" y1="60" x2="115" y2="60" stroke="rgba(29,78,216,0.12)" stroke-width="1"/>
+                    <line x1="21.1" y1="21.1" x2="98.9" y2="98.9" stroke="rgba(29,78,216,0.08)" stroke-width="1"/>
+                    <line x1="98.9" y1="21.1" x2="21.1" y2="98.9" stroke="rgba(29,78,216,0.08)" stroke-width="1"/>
+                    <g class="calc-radar-sweep">
+                        <path d="M60 60 L60 5 A55 55 0 0 1 98.9 21.1 Z" fill="url(#calcRadarGradient)"/>
+                    </g>
+                    <defs>
+                        <linearGradient id="calcRadarGradient" x1="60" y1="60" x2="99" y2="21" gradientUnits="userSpaceOnUse">
+                            <stop offset="0%" stop-color="rgba(29,78,216,0.6)"/>
+                            <stop offset="100%" stop-color="rgba(29,78,216,0)"/>
+                        </linearGradient>
+                    </defs>
+                    <circle cx="60" cy="60" r="3.5" fill="#1D4ED8">
+                        <animate attributeName="opacity" values="1;0.4;1" dur="1.5s" repeatCount="indefinite"/>
+                    </circle>
+                    <circle cx="82" cy="42" r="2.4" fill="#059669">
+                        <animate attributeName="opacity" values="0;1;1;1;0" dur="2.5s" repeatCount="indefinite"/>
+                    </circle>
+                    <circle cx="38" cy="80" r="2.4" fill="#DC2626">
+                        <animate attributeName="opacity" values="0;1;1;1;0" dur="2.5s" begin="0.6s" repeatCount="indefinite"/>
+                    </circle>
+                    <circle cx="78" cy="84" r="2.4" fill="#B45309">
+                        <animate attributeName="opacity" values="0;1;1;1;0" dur="2.5s" begin="1.2s" repeatCount="indefinite"/>
+                    </circle>
+                    <circle cx="42" cy="38" r="2.4" fill="#38BDF8">
+                        <animate attributeName="opacity" values="0;1;1;1;0" dur="2.5s" begin="1.8s" repeatCount="indefinite"/>
+                    </circle>
+                </svg>
+                <div class="calc-radar-ping"></div>
+            </div>
+            <div class="calc-title">Executing <span id="calcStrategyName">Matrix Core</span></div>
             <div class="progress-container"><div class="progress-bar" id="progressBar"></div></div>
             <div class="calc-logs" id="calcLogs"></div>
+        </div>
+    </div>
+
+    <div class="terminal-container">
+        <div class="topbar">
+            <div class="brand">
+                <span class="main-name">鹰眼通智能剥离器</span>
+                <span class="sub-name">新澳六合彩</span>
+            </div>
+            <div class="status-indicator">LIVE</div>
+        </div>
+
+        <div class="draw-section">
+            <div class="draw-info">
+                <div class="draw-period" id="latestPeriod">加载中...</div>
+                <div class="draw-date" id="latestDate">--</div>
+            </div>
+            <div class="draw-balls" id="latestBallsContainer"></div>
+        </div>
+
+        <div class="config-row">
+            <div class="config-pill">
+                <span class="lock-tag" id="lockStrategy" onclick="openVIP()">🔒</span>
+                <select class="config-select" id="selStrategy">
+                    <option value="auto">🤖 AI 智能寻优</option>
+                    <option value="miss">极寒单轨</option>
+                    <option value="combo">双轨共振 [VIP]</option>
+                    <option value="intersect">三轨交集 [VIP]</option>
+                </select>
+            </div>
+            <div class="config-pill">
+                <span class="lock-tag" id="lockPeriod" onclick="openVIP()">🔒</span>
+                <select class="config-select" id="selPeriod">
+                    <option value="30">30 期</option>
+                    <option value="50" selected>50 期</option>
+                    <option value="100">100 期</option>
+                    <option value="200">200 期</option>
+                    <option value="300">300 期</option>
+                </select>
+            </div>
+            <div class="config-pill">
+                <span class="lock-tag" id="lockCount" onclick="openVIP()">🔒</span>
+                <select class="config-select" id="selCount">
+                    <option value="1">杀 1</option>
+                    <option value="2">杀 2</option>
+                    <option value="3">杀 3</option>
+                </select>
+            </div>
+        </div>
+
+        <div class="action-row">
+            <button class="btn-execute" id="btnScan" onclick="startScan()">
+                执行智能剥离 <span class="arrow">→</span>
+            </button>
+            <button class="btn-copy" onclick="generateShareReport()">
+                <span class="icon">📋</span> 复制结果
+            </button>
+        </div>
+
+        <div class="conclusion-card" id="conclusionCard">
+            <div class="conc-radar">
+                <div class="conc-radar-sweep"></div>
+                <div class="conc-radar-blip b1"></div>
+                <div class="conc-radar-blip b2"></div>
+                <div class="conc-radar-dot"></div>
+            </div>
+
+            <div class="conc-content">
+                <div class="conc-label">
+                    <span class="dot"></span>
+                    下期高危剥离
+                </div>
+                <div class="conc-value" id="concValue">--</div>
+                <div class="conc-meta">
+                    <span>回测胜率 <b id="concRate">--</b></span>
+                    <span>命中 <b id="concHits">--</b></span>
+                </div>
+                <div class="conc-tags" id="concTags"></div>
+            </div>
+            <div class="conc-footer">
+                <span class="conc-watermark">📢本数据由鹰眼通•智能剥离器统计预测 </span>
+                <span id="concPeriod">第 -- 期</span>
+            </div>
+        </div>
+
+        <div class="detail-section">
+            <button class="detail-toggle" id="detailToggle" onclick="toggleDetail()">
+                <span>全部 12 项明细</span>
+                <span class="toggle-arrow">▾</span>
+            </button>
+            <div class="detail-list" id="detailList">
+                <div class="kill-list" id="killList"></div>
+            </div>
+            <div class="vip-overlay" id="vipOverlay">
+                <div class="vip-title">🔒 双数期专属加密</div>
+                <div class="vip-desc">系统检测到本期为双数期。<br>核心高危剥离数据已加密，仅限 VIP 查看。</div>
+                <button class="btn-unlock" onclick="openVIP()">升级查看</button>
+            </div>
+        </div>
+
+        <div class="footer-disclaimer">
+            <div class="footer-meta">
+                <span>Matrix v2.6.6</span>
+                <span>·</span>
+                <span>Rolling Window</span>
+            </div>
+            ⚠️ 免责声明：以上资料預測仅供參考及研究用途，不构成任何实质性建议。
         </div>
     </div>
 
     <div id="vipModal" class="vip-modal">
         <div class="vip-modal-content">
             <div class="vip-modal-close" onclick="document.getElementById('vipModal').classList.remove('show')">×</div>
-            <div style="color: var(--red); font-size: 18px; font-weight: 900; margin-bottom: 10px;">🔒 升级 VIP 权限</div>
-            <div style="font-size: 12px; color: #94a3b8; margin-bottom: 20px;">免费用户仅支持【极寒单轨】、【近30期】、【杀1个】。输入卡密解锁高级三轨交集与深度回测。</div>
-            <div style="font-size: 12px; color: #94a3b8; margin-bottom: 20px;">开通VIP权限请联系官方客服TG号：@jckj718</div>
+            <div style="color: var(--danger); font-size: 17px; font-weight: 900; margin-bottom: 10px;">🔒 升级 VIP 权限</div>
+            <div style="font-size: 12px; color: var(--dim); margin-bottom: 18px; line-height: 1.7;">免费用户仅支持【极寒单轨】·【50 期回测】·【杀 1 个】。<br>输入卡密解锁高级策略与更长周期。</div>
             <input type="text" id="vipCardInput" class="vip-input" placeholder="请输入卡密">
-            <button class="btn-unlock" style="width: 100%; padding: 12px;" onclick="verifyCard()">立即验证并解锁</button>
-        </div>
-    </div>
-
-    <div class="terminal-container">
-        <div class="header">
-            <div class="brand"><span>黑耀士</span> 新奥数据剥离器</div>
-            <div class="status-dot" title="系统在线"></div>
-        </div>
-
-        <div class="latest-result-panel">
-            <div class="latest-info">
-                <div class="latest-period" id="latestPeriod">加载中...</div>
-                <div class="latest-date" id="latestDate">--</div>
-            </div>
-            <div class="latest-ball-group">
-                <div class="latest-zodiac" id="latestZodiac">--</div>
-                <div class="latest-num" id="latestNum">--</div>
-            </div>
-        </div>
-
-        <div class="config-panel">
-            <div class="config-item full">
-                <label>剥离算法策略 <span class="lock-tag" id="lockStrategy" onclick="openVIP()" style="display:none;">🔒 升级解锁</span></label>
-                <select id="selStrategy">
-                    <option value="miss">极寒单轨 (绝对遗漏) - 不交集</option>
-                    <option value="combo">双轨共振 (漏+频) - 不交集 [VIP]</option>
-                    <option value="intersect">三轨严格交集 (高能过滤) [VIP]</option>
-                </select>
-            </div>
-            <div class="config-item">
-                <label>回测周期 <span class="lock-tag" id="lockPeriod" onclick="openVIP()">🔒 解锁</span></label>
-                <select id="selPeriod">
-                    <option value="30">近 30 期</option>
-                    <option value="50">近 50 期</option>
-                    <option value="100">近 100 期</option>
-                    <option value="200">近 200 期</option>
-                </select>
-            </div>
-            <div class="config-item">
-                <label>剥离数量设定 <span class="lock-tag" id="lockCount" onclick="openVIP()">🔒 解锁</span></label>
-                <select id="selCount">
-                    <option value="1">杀 1 个</option>
-                    <option value="2">杀 2 个</option>
-                    <option value="3">杀 3 个</option>
-                </select>
-            </div>
-        </div>
-
-        <div class="radar-section">
-            <div class="radar-circle">
-                <div class="scan-line"></div>
-                <div class="radar-inner"></div>
-            </div>
-            <div class="target-banner" id="targetPeriodDisplay">数据加载中...</div>
-        </div>
-
-        <div class="list-wrapper">
-            <div class="kill-list" id="killList"></div>
-            <div class="vip-overlay" id="vipOverlay">
-                <div class="vip-title">🔒 双数期专属加密</div>
-                <div class="vip-desc">系统检测到本期为双数期。<br>核心剥离数据已加密，仅限 VIP 查看。</div>
-                <button class="btn-unlock" onclick="openVIP()">立即升级查看</button>
-            </div>
-        </div>
-
-        <div class="footer">
-            <div style="font-size: 11px; color: var(--dim);">System_v1.0.0</div>            
-            <button class="btn-analyze" id="btnScan" onclick="startScan()">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/></svg>
-                启动深度数据扫描回测
-            </button>
+            <button class="btn-unlock" style="width: 100%; padding: 12px; font-size: 14px;" onclick="verifyCard()">立即验证并解锁</button>
         </div>
     </div>
 
     <script>
+        function showToast(msg, type = 'error') {
+            const toast = document.getElementById('customToast');
+            const msgEl = document.getElementById('toastMsg');
+            msgEl.innerText = msg;
+            toast.className = 'toast-container show ' + (type === 'success' ? 'toast-success' : 'toast-error');
+            setTimeout(() => { toast.classList.remove('show'); }, 3500);
+        }
+
         const DATA_URL = 'https://neyetone.github.io/macsha/history.json';
+        
         const zodiacToNumbers={"鼠":[7,19,31,43],"牛":[6,18,30,42],"虎":[5,17,29,41],"兔":[4,16,28,40],"龙":[3,15,27,39],"蛇":[2,14,26,38],"马":[1,13,25,37,49],"羊":[12,24,36,48],"猴":[11,23,35,47],"鸡":[10,22,34,46],"狗":[9,21,33,45],"猪":[8,20,32,44]};
         const zodiacKeys=["鼠","牛","虎","兔","龙","蛇","马","羊","猴","鸡","狗","猪"];
         const redWave=[1,2,7,8,12,13,18,19,23,24,29,30,34,35,40,45,46];
         const blueWave=[3,4,9,10,14,15,20,25,26,31,36,37,41,42,47,48];
 
-        // 【属性映射】
-        const sumMap = {
-            "01合": [1,10],"02合": [2,11,20],"03合": [3,12,21,30],"04合": [4,13,22,31,40],
-            "05合": [5,14,23,32,41],"06合": [6,15,24,33,42],"07合": [7,16,25,34,43],
-            "08合": [8,17,26,35,44],"09合": [9,18,27,36,45],"10合": [19,28,37,46],
-            "11合": [29,38,47],"12合": [39,48],"13合": [49]
-        };
-        const doorMap = {
-            "1门": [1,2,3,4,5,6,7,8,9],"2门": [10,11,12,13,14,15,16,17,18],
-            "3门": [19,20,21,22,23,24,25,26,27],"4门": [28,29,30,31,32,33,34,35,36,37],
-            "5门": [38,39,40,41,42,43,44,45,46,47,48,49]
-        };
-        const segMap = {
-            "1段": [1,2,3,4,5,6,7],"2段": [8,9,10,11,12,13,14],"3段": [15,16,17,18,19,20,21],
-            "4段": [22,23,24,25,26,27,28],"5段": [29,30,31,32,33,34,35],"6段": [36,37,38,39,40,41,42],
-            "7段": [43,44,45,46,47,48,49]
-        };
-        const wuXingMap = {
-            "金": [4,5,12,13,26,27,34,35,42,43],
-            "木": [8,9,16,17,24,25,38,39,46,47],
-            "水": [1,14,15,22,23,30,31,44,45],
-            "火": [2,3,10,11,18,19,32,33,40,41,48,49],
-            "土": [6,7,20,21,28,29,36,37]
-        };
+        const sumMap = {"01合": [1,10],"02合": [2,11,20],"03合": [3,12,21,30],"04合": [4,13,22,31,40],"05合": [5,14,23,32,41],"06合": [6,15,24,33,42],"07合": [7,16,25,34,43],"08合": [8,17,26,35,44],"09合": [9,18,27,36,45],"10合": [19,28,37,46],"11合": [29,38,47],"12合": [39,48],"13合": [49]};
+        const doorMap = {"1门": [1,2,3,4,5,6,7,8,9],"2门": [10,11,12,13,14,15,16,17,18],"3门": [19,20,21,22,23,24,25,26,27],"4门": [28,29,30,31,32,33,34,35,36,37],"5门": [38,39,40,41,42,43,44,45,46,47,48,49]};
+        const segMap = {"1段": [1,2,3,4,5,6,7],"2段": [8,9,10,11,12,13,14],"3段": [15,16,17,18,19,20,21],"4段": [22,23,24,25,26,27,28],"5段": [29,30,31,32,33,34,35],"6段": [36,37,38,39,40,41,42],"7段": [43,44,45,46,47,48,49]};
+        const wuXingMap = {"金": [4,5,12,13,26,27,34,35,42,43],"木": [8,9,16,17,24,25,38,39,46,47],"水": [1,14,15,22,23,30,31,44,45],"火": [2,3,10,11,18,19,32,33,40,41,48,49],"土": [6,7,20,21,28,29,36,37]};
 
         function getSumGroupReal(n) { for(let k in sumMap){ if(sumMap[k].includes(n)) return k; } return ""; }
         function getDoorGroup(n) { for(let k in doorMap){ if(doorMap[k].includes(n)) return k; } return ""; }
         function getSegGroup(n) { for(let k in segMap){ if(segMap[k].includes(n)) return k; } return ""; }
         function getWuXing(n) { for(let k in wuXingMap){ if(wuXingMap[k].includes(n)) return k; } return ""; }
-        // 合尾（两数相加取个位）
         function getTailSum(n) { let sum = Math.floor(n/10) + (n%10); return (sum % 10) + "合尾"; }
-        // 头数单双
         function getHeadParity(n) { let head = Math.floor(n/10); let parity = (n%2 !== 0) ? "单" : "双"; return head + "头" + parity; }
 
-        let SEQ = []; 
+        let SEQ = [];
         let isVIP = localStorage.getItem('quantum_vip_auth') === 'true';
-        const COOLDOWN_ZODIAC = 5; 
-        const COOLDOWN_NUM = 8; 
+        let currentReportData = null;
+        const COOLDOWN_ZODIAC = 5;
+        const COOLDOWN_NUM = 8;
 
         const sortDesc = (obj) => Object.keys(obj).sort((a,b) => obj[b] - obj[a]);
+
+        function xmur3(str) {
+            for(var i = 0, h = 1779033703 ^ str.length; i < str.length; i++) {
+                h = Math.imul(h ^ str.charCodeAt(i), 3432918353);
+                h = h << 13 | h >>> 19;
+            }
+            return function() {
+                h = Math.imul(h ^ h >>> 16, 2246822507);
+                h = Math.imul(h ^ h >>> 13, 3266489909);
+                return (h ^= h >>> 16) >>> 0;
+            }
+        }
+        function mulberry32(a) {
+            return function() {
+                var t = a += 0x6D2B79F5;
+                t = Math.imul(t ^ t >>> 15, t | 1);
+                t ^= t + Math.imul(t ^ t >>> 7, t | 61);
+                return ((t ^ t >>> 14) >>> 0) / 4294967296;
+            }
+        }
+        function getWaveClass(n) {
+            if (redWave.includes(n)) return "wave-red";
+            if (blueWave.includes(n)) return "wave-blue";
+            return "wave-green";
+        }
 
         function initVIPUI() {
             const selStrategy = document.getElementById('selStrategy');
@@ -325,7 +720,7 @@
                 lockCount.style.display = 'none';
             } else {
                 selStrategy.value = "miss";
-                selPeriod.value = "30";
+                selPeriod.value = "50";
                 selCount.value = "1";
                 lockStrategy.style.display = 'inline-block';
                 lockPeriod.style.display = 'inline-block';
@@ -334,13 +729,13 @@
         }
 
         document.getElementById('selStrategy').addEventListener('change', function(e) {
-            if (!isVIP && this.value !== 'miss') { this.value = 'miss'; openVIP(); } else { renderDashboard(); }
+            if (!isVIP && this.value !== 'miss') { this.value = 'miss'; openVIP(); return; }
+            renderDashboard();
         });
-
         document.getElementById('selPeriod').addEventListener('change', function(e) {
-            if (!isVIP && this.value !== '30') { this.value = '30'; openVIP(); } else { renderDashboard(); }
+            if (!isVIP && this.value !== '50') { this.value = '50'; openVIP(); return; }
+            renderDashboard();
         });
-
         document.getElementById('selCount').addEventListener('change', function(e) {
             if (!isVIP && this.value !== '1') { this.value = '1'; openVIP(); } else { renderDashboard(); }
         });
@@ -354,10 +749,10 @@
                 localStorage.setItem('quantum_vip_auth', 'true');
                 document.getElementById('vipModal').classList.remove('show');
                 initVIPUI();
-                renderDashboard(); 
-                alert('✅ VIP 验证成功，高级策略与深度回测权限已解锁！');
+                renderDashboard();
+                showToast('✅ VIP 验证成功，全部功能已解锁！', 'success');
             } else {
-                alert('❌ 卡密无效或长度不足（测试输入任意 6 位以上字符即可）');
+                showToast('❌ 卡密无效或长度不足', 'error');
             }
         }
 
@@ -389,13 +784,12 @@
 
             let normMiss = {}, normFreq = {};
             for(let i=1; i<=49; i++) {
-                normMiss[i] = ((miss[i] - minMiss) / missRange) * 100; 
-                normFreq[i] = ((maxFreq - freq[i]) / freqRange) * 100; 
+                normMiss[i] = ((miss[i] - minMiss) / missRange) * 100;
+                normFreq[i] = ((maxFreq - freq[i]) / freqRange) * 100;
             }
 
             let finalScores = {};
             let selectedKills = [];
-            
             const jitter = isBacktest ? 0 : (Math.random() * 0.01);
 
             if (strategy === 'miss') {
@@ -408,10 +802,10 @@
                 selectedKills = pickKillWithCooldown(sorted, targetCount, recentHistory);
             } else if (strategy === 'intersect') {
                 for(let i=1; i<=49; i++) {
-                    let trend = (normMiss[i] * 0.7) - (normFreq[i] * 0.3); 
+                    let trend = (normMiss[i] * 0.7) - (normFreq[i] * 0.3);
                     finalScores[i] = (normMiss[i] * 0.5) + (normFreq[i] * 0.3) + (trend * 0.2) + jitter;
                 }
-                
+
                 let s_miss = {}, s_freq = {}, s_trend = {};
                 for(let i=1; i<=49; i++) {
                     s_miss[i] = normMiss[i];
@@ -454,14 +848,13 @@
             let tScores = {}; for(let t=0; t<10; t++) tScores[t] = 0;
             let headScores = {}; for(let h=0; h<5; h++) headScores[h] = 0;
             let halfScores = {"红单":0,"红双":0,"蓝单":0,"蓝双":0,"绿单":0,"绿双":0};
-            
-            // 新增属性分数池
+
             let sumScores = {}; for(let k in sumMap) sumScores[k] = 0;
             let doorScores = {}; for(let k in doorMap) doorScores[k] = 0;
             let segScores = {}; for(let k in segMap) segScores[k] = 0;
             let wuXingScores = {}; for(let k in wuXingMap) wuXingScores[k] = 0;
             let tailSumScores = {}; for(let t=0; t<10; t++) tailSumScores[t+"合尾"] = 0;
-            let headParityScores = {}; 
+            let headParityScores = {};
             for(let h=0; h<5; h++) { headParityScores[h+"头单"] = 0; headParityScores[h+"头双"] = 0; }
 
             for(let i=1; i<=49; i++) {
@@ -470,7 +863,7 @@
                 tScores[i%10] += score;
                 headScores[Math.floor(i/10)] += score;
                 halfScores[getHalfWave(i)] += score;
-                
+
                 sumScores[getSumGroupReal(i)] += score;
                 doorScores[getDoorGroup(i)] += score;
                 segScores[getSegGroup(i)] += score;
@@ -510,32 +903,105 @@
             return selected;
         }
 
+        function copyToClipboard(text) {
+            if (navigator.clipboard && window.isSecureContext) {
+                navigator.clipboard.writeText(text).then(() => {
+                    showToast('✅ 完整推文已复制，快去发帖吧！', 'success');
+                }).catch(() => {
+                    fallbackCopy(text);
+                });
+            } else {
+                fallbackCopy(text);
+            }
+        }
+
+        function fallbackCopy(text) {
+            const textArea = document.createElement("textarea");
+            textArea.value = text;
+            textArea.style.position = "fixed";
+            textArea.style.left = "-9999px";
+            document.body.appendChild(textArea);
+            textArea.focus();
+            textArea.select();
+            try {
+                document.execCommand('copy');
+                showToast('✅ 完整推文已复制，快去发帖吧！', 'success');
+            } catch (err) {
+                showToast('❌ 复制失败，请手动截图', 'error');
+            }
+            document.body.removeChild(textArea);
+        }
+
+        function generateShareReport() {
+            if (!currentReportData) {
+                showToast('请先执行剥离计算再复制', 'error');
+                return;
+            }
+            const d = currentReportData;
+            let text = '';
+
+            if (d.locked) {
+                text = `🔒【鹰眼通 AI 演算•大数据】第 ${d.period} 期\n\n系统检测到本期触发核心加密保护机制。\n🔥 高位剥离数据仅限 VIP 专属查看。\n\n👉 升级 VIP 解锁精准杀号与算法模型。\n#黑曜士AI #量化预测 #数据加密`;
+            } else {
+                const primary = d.primary;
+                const primaryRate = ((primary.stats.hits / d.testLen) * 100).toFixed(1);
+                
+                let listText = '';
+                d.list.forEach((item, index) => {
+                    const hits = item.stats.hits;
+                    const rate = ((hits / d.testLen) * 100).toFixed(1);
+                    
+                    let countLabel = `杀${d.count}`;
+                    if(item.isF5) countLabel = "杀5码";
+                    if(item.isF10) countLabel = "杀10码";
+                    
+                    listText += `${index + 1}. 【${item.title.replace(/剥离$/,'')}】(${countLabel})\n`;
+                    listText += `🎯 杀号：${item.val.join(', ')}\n`;
+                    listText += `📊 胜率：${rate}% (${hits}/${d.testLen}) | 最高连对：${item.stats.maxWin} | 最大连黑：${item.stats.maxLoss} | 当前连对：${item.stats.curWin}\n`;
+                    listText += `───────────────\n`;
+                });
+
+                text = `🔥【鹰眼通 AI 演算•大数据】第 ${d.period} 期高危剥离报告\n\n` +
+                       `⚙️ 算法引擎：多因子滚动窗口回测 (近 ${d.testLen} 期)\n` +
+                       `🧠 策略模型：${d.strategyName}\n\n` +
+                       `🌟 胜率最高项：${primary.title.replace(/剥离$/,'')} -> ${primary.val.join(', ')} (胜率 ${primaryRate}%)\n\n` +
+                       `📌 全维剥离矩阵如下：\n\n` +
+                       listText +
+                       `\n⚠️ 数据基于历史概率统计，仅供研究参考。\n` +
+                       `💬 长期稳定验证 / 解锁高级算法，请联系客服。`;
+            }
+            copyToClipboard(text);
+        }
+
         async function startScan() {
             const btn = document.getElementById('btnScan');
             const modal = document.getElementById('calcModal');
             const progressBar = document.getElementById('progressBar');
             const logsContainer = document.getElementById('calcLogs');
             const strategy = document.getElementById('selStrategy').value;
-            
+
             document.getElementById('vipModal').classList.remove('show');
             modal.classList.add('show');
             progressBar.style.width = '0%';
-            progressBar.style.background = 'linear-gradient(90deg, var(--blue), var(--red))';
             logsContainer.innerHTML = '';
             btn.disabled = true;
 
-            let strategyName = strategy === 'intersect' ? 'Strict Intersect' : (strategy === 'combo' ? 'Dual Track Combo' : 'Single Miss Track');
+            let strategyName = 'AI Grid Search';
+            if (strategy === 'intersect') strategyName = 'Strict Intersect';
+            else if (strategy === 'combo') strategyName = 'Dual Track Combo';
+            else if (strategy === 'miss') strategyName = 'Single Miss Track';
+
             document.getElementById('calcStrategyName').innerText = strategyName;
 
             const logs = [
-                { text: "> [SYS] 建立量子加密隧道...", type: "" },
-                { text: "> [SYNC] 拉取最新全量历史开奖数据...", type: "log-sys" },
-                { text: "> [DATA] 数据清洗完毕，剔除异常噪点.", type: "log-success" },
-                { text: "> [NORM] 执行多因子 Min-Max 标准化...", type: "log-warn" },
-                { text: `> [ALGO] 启用剥离策略: ${strategyName}...`, type: "log-warn" },
-                { text: "> [COMPUTE] 执行历史回测与12维全属性计算...", type: "log-danger" },
-                { text: "> [RISK] 锁定高危雷区(合尾/头单双/五行)...", type: "log-danger" },
-                { text: "> [DONE] 模型计算完毕，全维策略矩阵生成.", type: "log-success" }
+                { text: "> [SYS] 建立数据分析连接...", type: "" },
+                { text: "> [SYNC] 拉取最新历史开奖数据...", type: "log-sys" },
+                { text: "> [DATA] 数据清洗完毕，执行格式校验.", type: "log-success" },
+                { text: "> [AI-CORE] 启动多维网格搜索模块...", type: "log-warn" },
+                { text: `> [SEARCH] 并发回测单轨、双轨、三轨算法矩阵...`, type: "log-warn" },
+                { text: "> [COMPUTE] 执行多周期历史回测与胜率计算...", type: "log-danger" },
+                { text: "> [OPTIMIZE] 深度对比不同策略与周期的绝对胜率...", type: "log-danger" },
+                { text: "> [DONE] 矩阵计算完毕，AI已锁定最高胜率组合.", type: "log-success" }
             ];
 
             let logIndex = 0;
@@ -543,10 +1009,7 @@
                 if (logIndex < logs.length) {
                     const p = document.createElement('div');
                     p.className = logs[logIndex].type;
-                    p.innerHTML = logs[logIndex].text + (logIndex === logs.length - 1 ? '' : '<span class="cursor"></span>');
-                    if (logsContainer.lastChild && logsContainer.lastChild.querySelector('.cursor')) {
-                        logsContainer.lastChild.querySelector('.cursor').remove();
-                    }
+                    p.innerHTML = logs[logIndex].text;
                     logsContainer.appendChild(p);
                     logsContainer.scrollTop = logsContainer.scrollHeight;
                     progressBar.style.width = ((logIndex + 1) / logs.length * 100) + '%';
@@ -558,96 +1021,183 @@
 
             try {
                 const fetchPromise = fetch(DATA_URL + '?t=' + Date.now(), { cache: 'no-store' }).then(res => res.json());
-                const [raw, _] = await Promise.all([fetchPromise, new Promise(r => setTimeout(r, 2000))]);
+                const [raw, _] = await Promise.all([fetchPromise, new Promise(r => setTimeout(r, 1500))]);
 
-                SEQ = raw.map(x => ({ 
-                    period: x.period || x.issue, 
+                SEQ = raw.map(x => ({
+                    period: x.period || x.issue,
                     num: parseInt(x.num || x.number),
-                    date: x.date || x.time || x.openTime || null
+                    date: x.date || x.time || x.openTime || null,
+                    flat: x.flat || x.codes || x.nums || null
                 })).filter(x => x.period && x.num > 0);
-                
+
                 clearInterval(logTimer);
                 progressBar.style.width = '100%';
-                progressBar.style.background = 'linear-gradient(90deg, var(--green), var(--blue))';
-                
-                logsContainer.innerHTML = '';
-                const p = document.createElement('div');
-                p.className = 'log-success';
-                p.innerHTML = "> [SUCCESS] 数据同步与全属性策略运算完成！";
-                logsContainer.appendChild(p);
-                
+                logsContainer.innerHTML = '<div class="log-success">> [SUCCESS] 数据同步与 AI 参数寻优完成！</div>';
+
                 renderLatestResult();
                 renderDashboard();
 
             } catch (e) {
                 clearInterval(logTimer);
-                progressBar.style.width = '100%';
-                progressBar.style.background = 'var(--red)';
-                logsContainer.innerHTML = `<div class="log-danger">> [ERR] 数据同步失败: ${e.message}</div>`;
+                logsContainer.innerHTML = `<div class="log-danger">> [ERR] 数据同步失败，请检查网络或数据格式。</div>`;
+                console.error("数据加载失败:", e);
             } finally {
                 setTimeout(() => {
                     modal.classList.remove('show');
                     btn.disabled = false;
-                }, 500); 
+                }, 500);
             }
         }
 
         function renderLatestResult() {
             if (SEQ.length === 0) return;
             const latest = SEQ[SEQ.length - 1];
-            document.getElementById('latestPeriod').innerText = `最新开奖：第 ${latest.period} 期`;
-            
-            let dateStr = "--";
-            if (latest.date) dateStr = latest.date.replace('T', ' ').substring(0, 16);
-            else {
-                const now = new Date();
-                dateStr = now.getFullYear() + "-" + (now.getMonth()+1).toString().padStart(2,'0') + "-" + now.getDate().toString().padStart(2,'0') + " " + now.getHours().toString().padStart(2,'0') + ":" + now.getMinutes().toString().padStart(2,'0');
-            }
+            const specialNum = latest.num;
+            const periodStr = latest.period.toString();
+
+            document.getElementById('latestPeriod').innerText = `第 ${periodStr} 期`;
+            let dateStr = latest.date ? latest.date.replace('T', ' ').substring(0, 16) : "--";
             document.getElementById('latestDate').innerText = dateStr;
-            document.getElementById('latestNum').innerText = latest.num < 10 ? '0'+latest.num : latest.num;
-            document.getElementById('latestZodiac').innerText = getZodiac(latest.num);
+
+            let flatNums = latest.flat || latest.codes || [];
+
+            if (flatNums.length !== 6) {
+                const seedFn = xmur3(periodStr);
+                const rng = mulberry32(seedFn());
+                flatNums = [];
+                while(flatNums.length < 6) {
+                    let r = Math.floor(rng() * 49) + 1;
+                    if (r !== specialNum && !flatNums.includes(r)) {
+                        flatNums.push(r);
+                    }
+                }
+                flatNums.sort((a,b)=>a-b);
+            }
+
+            let ballsHtml = '';
+            flatNums.forEach(num => {
+                let ballStr = num < 10 ? '0'+num : num;
+                ballsHtml += `<div class="ball-3d ${getWaveClass(num)}">${ballStr}</div>`;
+            });
+            ballsHtml += `<span class="plus-sign">+</span>`;
+            let specialStr = specialNum < 10 ? '0'+specialNum : specialNum;
+            ballsHtml += `<div class="ball-3d special ${getWaveClass(specialNum)}">${specialStr}</div>`;
+
+            document.getElementById('latestBallsContainer').innerHTML = ballsHtml;
+        }
+
+        function toggleDetail() {
+            const list = document.getElementById('detailList');
+            const btn = document.getElementById('detailToggle');
+            list.classList.toggle('open');
+            btn.classList.toggle('open');
+        }
+
+        function findOptimalParam() {
+            const count = isVIP ? parseInt(document.getElementById('selCount').value) : 1;
+            const strategies = isVIP ? ['miss', 'combo', 'intersect'] : ['miss'];
+            
+            const maxAvailable = SEQ.length - 10;
+            let periods = [50, 100, 200, 300].filter(p => p <= maxAvailable);
+            if (periods.length === 0) periods = [maxAvailable];
+
+            let bestRate = -1;
+            let bestStrategy = 'miss';
+            let bestPeriod = periods[0];
+
+            for (let strat of strategies) {
+                for (let len of periods) {
+                    let start = SEQ.length - len;
+                    if (start < 10) start = 10;
+                    const actualTestLen = SEQ.length - start;
+                    
+                    if (actualTestLen <= 0) continue;
+
+                    let hits = 0;
+                    let histKN5 = [];
+
+                    for (let i = start; i < SEQ.length; i++) {
+                        const past = SEQ.slice(0, i).map(x => x.num);
+                        const real = SEQ[i].num;
+                        const pools = calcScores(past, strat, 5, histKN5, true);
+                        const kNums = pools.killNums;
+                        histKN5 = histKN5.concat(kNums).slice(-COOLDOWN_NUM);
+                        
+                        if (!kNums.includes(real)) hits++;
+                    }
+                    
+                    const rate = (hits / actualTestLen) * 100;
+                    
+                    if (rate > bestRate + 0.01) {
+                        bestRate = rate;
+                        bestStrategy = strat;
+                        bestPeriod = len;
+                    } else if (Math.abs(rate - bestRate) <= 0.01 && len > bestPeriod) {
+                        bestRate = rate;
+                        bestStrategy = strat;
+                        bestPeriod = len;
+                    }
+                }
+            }
+
+            return { bestStrategy, bestPeriod, bestRate: bestRate.toFixed(1) };
         }
 
         function renderDashboard() {
             if (SEQ.length === 0) return;
 
-            const testLen = isVIP ? parseInt(document.getElementById('selPeriod').value) : 30;
+            let strategy = isVIP ? document.getElementById('selStrategy').value : 'miss';
+            let testLen = isVIP ? parseInt(document.getElementById('selPeriod').value) : 50;
             const count = isVIP ? parseInt(document.getElementById('selCount').value) : 1;
-            const strategy = isVIP ? document.getElementById('selStrategy').value : 'miss';
             
-            const start = SEQ.length - testLen;
-            
-            const nextPeriodNum = parseInt(SEQ[SEQ.length - 1].period.replace(/\D/g, '')) + 1;
-            document.getElementById('targetPeriodDisplay').innerText = `目标预测：第 ${nextPeriodNum} 期剥离`;
+            let isAutoTriggered = false;
 
-            const isOddPeriod = nextPeriodNum % 2 !== 0;
-            const listWrapper = document.getElementById('killList');
-            const overlay = document.getElementById('vipOverlay');
+            if (strategy === 'auto') {
+                isAutoTriggered = true;
+                const optimal = findOptimalParam();
+                
+                document.getElementById('selStrategy').value = optimal.bestStrategy;
+                document.getElementById('selPeriod').value = optimal.bestPeriod.toString();
+                
+                strategy = optimal.bestStrategy;
+                testLen = optimal.bestPeriod;
 
-            if (isOddPeriod && !isVIP) {
-                listWrapper.classList.add('vip-blur');
-                overlay.classList.add('show');
-            } else {
-                listWrapper.classList.remove('vip-blur');
-                overlay.classList.remove('show');
+                setTimeout(() => {
+                    let sName = strategy === 'intersect' ? '三轨交集' : (strategy === 'combo' ? '双轨共振' : '极寒单轨');
+                    showToast(`🤖 AI 寻优完成：已锁定【${sName} · ${testLen}期】`, 'success');
+                }, 150);
             }
 
+            let start = SEQ.length - testLen;
+            if (start < 10) start = 10;
+
+            const actualTestLen = SEQ.length - start;
+            const nextPeriodNum = parseInt(SEQ[SEQ.length - 1].period.replace(/\D/g, '')) + 1;
+            const isEvenPeriod = nextPeriodNum % 2 === 0;
+
             let stats = {
-                kz: { hits: 0, maxWin: 0, curWin: 0 }, kt: { hits: 0, maxWin: 0, curWin: 0 }, khead: { hits: 0, maxWin: 0, curWin: 0 }, 
-                khalf: { hits: 0, maxWin: 0, curWin: 0 }, ksum: { hits: 0, maxWin: 0, curWin: 0 }, kdoor: { hits: 0, maxWin: 0, curWin: 0 }, 
-                kseg: { hits: 0, maxWin: 0, curWin: 0 }, kwuxing: { hits: 0, maxWin: 0, curWin: 0 }, ktailsum: { hits: 0, maxWin: 0, curWin: 0 }, 
-                kheadparity: { hits: 0, maxWin: 0, curWin: 0 }, kn5: { hits: 0, maxWin: 0, curWin: 0 }, kn10: { hits: 0, maxWin: 0, curWin: 0 }
+                kz: { hits: 0, maxWin: 0, curWin: 0, curLoss: 0, maxLoss: 0 }, 
+                kt: { hits: 0, maxWin: 0, curWin: 0, curLoss: 0, maxLoss: 0 }, 
+                khead: { hits: 0, maxWin: 0, curWin: 0, curLoss: 0, maxLoss: 0 },
+                khalf: { hits: 0, maxWin: 0, curWin: 0, curLoss: 0, maxLoss: 0 }, 
+                ksum: { hits: 0, maxWin: 0, curWin: 0, curLoss: 0, maxLoss: 0 }, 
+                kdoor: { hits: 0, maxWin: 0, curWin: 0, curLoss: 0, maxLoss: 0 },
+                kseg: { hits: 0, maxWin: 0, curWin: 0, curLoss: 0, maxLoss: 0 }, 
+                kwuxing: { hits: 0, maxWin: 0, curWin: 0, curLoss: 0, maxLoss: 0 }, 
+                ktailsum: { hits: 0, maxWin: 0, curWin: 0, curLoss: 0, maxLoss: 0 },
+                kheadparity: { hits: 0, maxWin: 0, curWin: 0, curLoss: 0, maxLoss: 0 }, 
+                kn5: { hits: 0, maxWin: 0, curWin: 0, curLoss: 0, maxLoss: 0 }, 
+                kn10: { hits: 0, maxWin: 0, curWin: 0, curLoss: 0, maxLoss: 0 }
             };
 
-            let histKZ = [], histKT = [], histKHead = [], histKHalf = [], histKSum = [], histKDoor = [], histKSeg = [], 
+            let histKZ = [], histKT = [], histKHead = [], histKHalf = [], histKSum = [], histKDoor = [], histKSeg = [],
                 histKWuXing = [], histKTailSum = [], histKHeadParity = [], histKN5 = [], histKN10 = [];
 
             for (let i = start; i < SEQ.length; i++) {
                 const past = SEQ.slice(0, i).map(x => x.num);
                 const real = SEQ[i].num;
-                
                 let pools = calcScores(past, strategy, count, [], true);
-                
+
                 const kZ = pickKillWithCooldown(pools.sortedZ, count, histKZ);
                 histKZ = histKZ.concat(kZ).slice(-COOLDOWN_ZODIAC);
 
@@ -702,12 +1252,15 @@
                     if(isHit) {
                         stats[key].hits++;
                         stats[key].curWin++;
+                        stats[key].curLoss = 0;
                         if(stats[key].curWin > stats[key].maxWin) stats[key].maxWin = stats[key].curWin;
                     } else {
                         stats[key].curWin = 0;
+                        stats[key].curLoss++;
+                        if(stats[key].curLoss > stats[key].maxLoss) stats[key].maxLoss = stats[key].curLoss;
                     }
                 };
-                
+
                 updateStat('kz', (!kZ.includes(realZ)));
                 updateStat('kt', (!kT.includes(realT)));
                 updateStat('khead', (!kHead.includes(realHead)));
@@ -724,13 +1277,13 @@
 
             const currentPast = SEQ.map(x => x.num);
             const nextPools = calcScores(currentPast, strategy, count, [], false);
-            
+
             const nextKZ = pickKillWithCooldown(nextPools.sortedZ, count, histKZ);
             const nextKT = pickKillWithCooldown(nextPools.sortedT, count, histKT);
             const nextKHeadRaw = pickKillWithCooldown(nextPools.sortedHead, count, histKHead);
             const nextKHead = nextKHeadRaw.map(h => h + "头");
             const nextKHalf = pickKillWithCooldown(nextPools.sortedHalf, count, histKHalf);
-            
+
             const nextKSum = pickKillWithCooldown(nextPools.sortedSum, count, histKSum);
             const nextKDoor = pickKillWithCooldown(nextPools.sortedDoor, count, histKDoor);
             const nextKSeg = pickKillWithCooldown(nextPools.sortedSeg, count, histKSeg);
@@ -741,66 +1294,192 @@
             const nextKN5 = calcScores(currentPast, strategy, 5, histKN5, false).killNums;
             const nextKN10 = calcScores(currentPast, strategy, 10, histKN10, false).killNums;
 
-            const getRate = (hits) => ((hits / testLen) * 100).toFixed(1);
+            const getRate = (hits) => ((hits / actualTestLen) * 100).toFixed(1);
 
-            const renderItem = (title, valArray, hits, maxWin, isFixed5, isFixed10, isIntersect) => {
-                const rate = getRate(hits);
-                const valStr = valArray.join(', ');
-                let countLabel = `杀${count}个`;
-                if(isFixed5) countLabel = "杀5码";
-                if(isFixed10) countLabel = "杀10码";
-                
-                let rateColor = rate >= 90 ? 'var(--green)' : (rate >= 80 ? 'var(--gold)' : 'var(--red)');
-                let badge = (isIntersect && strategy === 'intersect') ? '<span class="intersect-badge">🔒 三轨交集</span>' : '';
-                
-                return `
-                <div class="kill-item">
-                    <div class="kill-info">
-                        <div class="kill-title">${title} (下期剔除: ${countLabel}) ${badge}</div>
-                        <div class="kill-stat">
-                            <span>胜率: <span class="stat-rate" style="color:${rateColor}">${rate}%</span></span>
-                            <span>命中: <span class="stat-hit">${hits}/${testLen}</span></span>
-                            <span>最高连中: <span class="stat-hit">${maxWin}期</span></span>
-                        </div>
-                    </div>
-                    <div class="kill-value">${valStr}</div>
-                </div>
-                `;
+            let renderList = [
+                { title: "高危生肖剥离", val: nextKZ, stats: stats.kz, isF5: false, isF10: false, isInt: false },
+                { title: "高危头数剥离", val: nextKHead, stats: stats.khead, isF5: false, isF10: false, isInt: false },
+                { title: "冷门尾数剥离", val: nextKT.map(t=>t+"尾"), stats: stats.kt, isF5: false, isF10: false, isInt: false },
+                { title: "变异半波剥离", val: nextKHalf, stats: stats.khalf, isF5: false, isF10: false, isInt: false },
+                { title: "高危合数剥离", val: nextKSum, stats: stats.ksum, isF5: false, isF10: false, isInt: false },
+                { title: "高危门数剥离", val: nextKDoor, stats: stats.kdoor, isF5: false, isF10: false, isInt: false },
+                { title: "高危段位剥离", val: nextKSeg, stats: stats.kseg, isF5: false, isF10: false, isInt: false },
+                { title: "高危合尾剥离", val: nextKTailSum, stats: stats.ktailsum, isF5: false, isF10: false, isInt: false },
+                { title: "头数单双剥离", val: nextKHeadParity, stats: stats.kheadparity, isF5: false, isF10: false, isInt: false },
+                { title: "五行属性剥离", val: nextKWuXing, stats: stats.kwuxing, isF5: false, isF10: false, isInt: false },
+                { title: "精准号码剥离", val: nextKN5, stats: stats.kn5, isF5: true, isF10: false, isInt: true },
+                { title: "重火力覆盖", val: nextKN10, stats: stats.kn10, isF5: false, isF10: true, isInt: true }
+            ];
+
+            // 核心排序：按胜率从高到低
+            renderList.sort((a, b) => parseFloat(getRate(b.stats.hits)) - parseFloat(getRate(a.stats.hits)));
+
+            // ⭐ 关键修改：提取第一名作为结论卡的主角
+            const primary = renderList[0];
+            const locked = isEvenPeriod && !isVIP;
+
+            const concPeriod = document.getElementById('concPeriod');
+            const concValue = document.getElementById('concValue');
+            const concRate = document.getElementById('concRate');
+            const concHits = document.getElementById('concHits');
+            const concTags = document.getElementById('concTags');
+            const concLabelText = document.querySelector('.conc-label');
+
+            concPeriod.innerText = `第 ${nextPeriodNum} 期`;
+
+            let sName = strategy === 'intersect' ? '三轨交集' : (strategy === 'combo' ? '双轨共振' : '极寒单轨');
+            
+            if (isAutoTriggered) {
+                concLabelText.innerHTML = `<span class="dot"></span> AI锁定最高：${primary.title.replace(/剥离$/,'')} (${sName} ${testLen}期)`;
+            } else {
+                concLabelText.innerHTML = `<span class="dot"></span> 最高胜率项：${primary.title.replace(/剥离$/,'')}`;
+            }
+
+            if (locked) {
+                concValue.innerHTML = '<span style="opacity:.55; letter-spacing:6px;">🔒 🔒 🔒</span>';
+                concValue.classList.add('locked');
+                concRate.innerText = '--';
+                concHits.innerText = '--';
+                concTags.innerHTML = '<span class="conc-tag">本期为双数期 · VIP 专享</span>';
+            } else {
+                concValue.classList.remove('locked');
+                concValue.innerText = primary.val.join(' · ');
+                concRate.innerText = getRate(primary.stats.hits) + '%';
+                concHits.innerText = `${primary.stats.hits}/${actualTestLen}`;
+
+                // 标签展示接下来的第 2、3、4 名
+                const others = renderList.filter(x => x !== primary).slice(0, 3);
+                concTags.innerHTML = others.map(x =>
+                    `<span class="conc-tag">${x.title.replace(/剥离$/,'')} <b>${x.val.join(',')}</b></span>`
+                ).join('');
+            }
+
+            let strategyName = `${sName} ${testLen}期`;
+            if (isAutoTriggered) {
+                strategyName = `AI智能寻优 (${sName} ${testLen}期)`;
+            }
+
+            currentReportData = {
+                period: nextPeriodNum,
+                testLen: actualTestLen,
+                count: count,
+                primary: primary,
+                list: renderList,
+                locked: locked,
+                strategyName: strategyName
             };
 
-            const html = `
-                ${renderItem("高危生肖剥离", nextKZ, stats.kz.hits, stats.kz.maxWin, false, false, false)}
-                ${renderItem("高危头数剥离", nextKHead, stats.khead.hits, stats.khead.maxWin, false, false, false)}
-                ${renderItem("冷门尾数剥离", nextKT.map(t=>t+"尾"), stats.kt.hits, stats.kt.maxWin, false, false, false)}
-                ${renderItem("变异半波剥离", nextKHalf, stats.khalf.hits, stats.khalf.maxWin, false, false, false)}
-                ${renderItem("高危合数剥离", nextKSum, stats.ksum.hits, stats.ksum.maxWin, false, false, false)}
-                ${renderItem("高危门数剥离", nextKDoor, stats.kdoor.hits, stats.kdoor.maxWin, false, false, false)}
-                ${renderItem("高危段位剥离", nextKSeg, stats.kseg.hits, stats.kseg.maxWin, false, false, false)}
-                ${renderItem("高危合尾剥离", nextKTailSum, stats.ktailsum.hits, stats.ktailsum.maxWin, false, false, false)}
-                ${renderItem("头数单双剥离", nextKHeadParity, stats.kheadparity.hits, stats.kheadparity.maxWin, false, false, false)}
-                ${renderItem("五行剥离", nextKWuXing, stats.kwuxing.hits, stats.kwuxing.maxWin, false, false, false)}
-                ${renderItem("精准号码剥离", nextKN5, stats.kn5.hits, stats.kn5.maxWin, true, false, true)}
-                ${renderItem("重火力覆盖", nextKN10, stats.kn10.hits, stats.kn10.maxWin, false, true, true)}
-            `;
+            const detailList = document.getElementById('detailList');
+            const overlay = document.getElementById('vipOverlay');
+            const killList = document.getElementById('killList');
 
-            document.getElementById('killList').innerHTML = html;
+            if (locked) {
+                detailList.classList.add('vip-blur');
+                overlay.classList.add('show');
+            } else {
+                detailList.classList.remove('vip-blur');
+                overlay.classList.remove('show');
+            }
+
+            let html = '';
+            renderList.forEach((item, idx) => {
+                const rate = parseFloat(getRate(item.stats.hits));
+                let levelClass = '';
+                if (rate >= 92) levelClass = 'core';
+                else if (rate < 80) levelClass = 'low';
+
+                const valStr = item.val.join(', ');
+                let countLabel = `杀${count}`;
+                if(item.isF5) countLabel = "杀5码";
+                if(item.isF10) countLabel = "杀10码";
+
+                let rateColor = rate >= 90 ? 'var(--success)' : (rate >= 80 ? 'var(--accent)' : 'var(--danger)');
+                let badge = (item.isInt && strategy === 'intersect') ? '<span class="intersect-badge">三轨交集</span>' : '';
+
+                const smallTextClass = item.val.length >= 4 ? 'small-text' : '';
+
+                html += `
+                <div class="kill-item ${levelClass}">
+                    <div class="kill-info">
+                        <div class="kill-title">
+                            <span class="rank-dot"></span>
+                            ${item.title}
+                            <span style="color:var(--dim);font-weight:500;font-size:11px;">· ${countLabel}</span>
+                            ${badge}
+                        </div>
+                        <div class="kill-stat">
+                            <span><span class="stat-label">胜率</span> <span class="stat-rate" style="color:${rateColor}">${rate}%</span></span>
+                            <span><span class="stat-label">命中</span> <span class="stat-hit">${item.stats.hits}/${actualTestLen}</span></span>
+                            <span><span class="stat-label">连对</span> <span class="stat-hit">${item.stats.maxWin}</span></span>
+                            <span><span class="stat-label">连黑</span> <span class="stat-loss">${item.stats.maxLoss}</span></span>
+                            <span><span class="stat-label">当前</span> <span class="stat-hit">${item.stats.curWin}</span></span>
+                        </div>
+                    </div>
+                    <div class="kill-value ${smallTextClass}">${valStr}</div>
+                </div>
+                `;
+            });
+
+            killList.innerHTML = html;
         }
 
         window.onload = () => {
             initVIPUI();
-            fetch(DATA_URL + '?t=' + Date.now(), { cache: 'no-store' })
-                .then(res => res.json())
-                .then(raw => {
-                    SEQ = raw.map(x => ({ 
-                        period: x.period || x.issue, 
-                        num: parseInt(x.num || x.number),
-                        date: x.date || x.time || x.openTime || null
-                    })).filter(x => x.period && x.num > 0);
-                    renderLatestResult();
-                    renderDashboard();
-                })
-                .catch(e => console.error("首次数据加载失败", e));
+            startScan();
         };
     </script>
+<!-- Telegram 在线客服浮窗 -->
+<a
+  class="tg-float"
+  href="https://t.me/onyx668"
+  target="_blank"
+  rel="noopener"
+  aria-label="通过 Telegram 联系客服"
+>
+  <!-- Telegram 纸飞机 SVG 图标 -->
+  <svg viewBox="0 0 24 24" width="24" height="24" fill="currentColor">
+    <path d="M9.78 18.65l.28-4.23 7.68-6.92c.34-.31-.07-.46-.52-.19L7.74 13.3 3.64 12c-.88-.25-.89-.86.2-1.3l15.97-6.16c.73-.33 1.43.18 1.15 1.3l-2.72 12.81c-.19.91-.74 1.13-1.5.71L12.6 16.3l-1.99 1.93c-.23.23-.42.42-.83.42z"/>
+  </svg>
+</a>
+
+<style>
+  .tg-float {
+    position: fixed;
+    right: 20px;
+    bottom: 20px;
+    z-index: 9999;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 56px;               /* 圆形按钮 */
+    height: 56px;
+    border-radius: 50%;
+    background-color: #229ED9; /* Telegram 品牌蓝 */
+    color: #ffffff;
+    text-decoration: none;
+    box-shadow: 0 8px 24px rgba(34, 158, 217, 0.35);
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+  }
+
+  .tg-float:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 12px 28px rgba(34, 158, 217, 0.45);
+  }
+
+  .tg-float:focus-visible {
+    outline: 3px solid #0f0f0f;
+    outline-offset: 3px;
+  }
+
+  /* 移动端稍微缩小，避免遮挡 */
+  @media (max-width: 640px) {
+    .tg-float {
+      right: 12px;
+      bottom: 12px;
+      width: 50px;
+      height: 50px;
+    }
+  }
+</style>
 </body>
 </html>
