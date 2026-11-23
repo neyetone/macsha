@@ -1,19 +1,9 @@
-<!-- 
-================================================================================
- 项目名称：鹰眼通 · 智能剥离器 (Obsidian · Smart Stripper)
- 当前版本：Matrix v2.6.6 (最高胜率展示版)
- 更新日志：
-   [v2.6.6] - 1. 修复结论卡固定显示“杀5码”的问题，现自动展示 12 项中胜率最高的结果；
-              2. 优化推文生成逻辑，置顶展示最高胜率项；
-              3. 添加客服浮窗。
-================================================================================
--->
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-<title>鹰眼通 ·智能剥离器 v2.6.6</title>
+<title>鹰眼通 · 智能组合过滤剥离器 v2.8</title>
 <style>
     :root {
         --primary: #1D4ED8;
@@ -205,6 +195,41 @@
         line-height: 1.4;
     }
 
+    /* ===== 预测卡数量选择 ===== */
+    .cardcount-row {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 0 16px 12px;
+        background: var(--card);
+    }
+    .cc-label {
+        font-size: 11px; font-weight: 800; color: var(--text-2);
+        white-space: nowrap; letter-spacing: 0.3px;
+    }
+    .cc-pills { display: flex; gap: 6px; flex: 1; }
+    .cc-pill {
+        flex: 1;
+        padding: 7px 0;
+        border-radius: 9px;
+        border: 1px solid var(--line);
+        background: #F5F5F3;
+        color: var(--text-2);
+        font-size: 12px;
+        font-weight: 800;
+        font-family: "SF Mono", monospace;
+        cursor: pointer;
+        transition: all .15s;
+        line-height: 1;
+    }
+    .cc-pill:hover { background: #EDEDEA; }
+    .cc-pill.active {
+        background: var(--primary-deep);
+        color: #fff;
+        border-color: var(--primary-deep);
+        box-shadow: 0 3px 10px -4px rgba(23,37,84,.6);
+    }
+
     .action-row {
         display: flex;
         gap: 8px;
@@ -260,7 +285,7 @@
 
     .conclusion-card {
         position: relative;
-        margin: 0 16px 16px;
+        margin: 0 16px 12px;
         padding: 18px 20px 16px;
         border-radius: 20px;
         background: linear-gradient(135deg, #1E1E1E 0%, #0A0A0A 100%);
@@ -323,6 +348,7 @@
         background: var(--cyan); border-radius: 50%;
         box-shadow: 0 0 6px var(--cyan);
         animation: radarPulseCyan 1.6s ease-in-out infinite;
+        flex-shrink: 0;
     }
     .conc-value {
         font-family: "SF Mono", "JetBrains Mono", monospace;
@@ -334,9 +360,16 @@
     .conc-value.locked { font-size: 20px; opacity: 0.5; letter-spacing: 4px; }
     .conc-meta {
         display: flex; gap: 18px; font-size: 12px; opacity: 0.85;
-        font-family: "SF Mono", monospace; margin-bottom: 14px;
+        font-family: "SF Mono", monospace; margin-bottom: 8px;
     }
     .conc-meta b { color: var(--cyan); font-weight: 800; font-size: 13px; text-shadow: 0 0 8px rgba(56,189,248,0.3); }
+    .conc-extra {
+        display: flex; gap: 14px; flex-wrap: wrap;
+        font-size: 11px; opacity: 0.85;
+        font-family: "SF Mono", monospace;
+        margin-bottom: 12px;
+    }
+    .conc-extra b { color: var(--cyan); font-weight: 800; font-size: 12px; }
     .conc-tags { display: flex; flex-wrap: wrap; gap: 6px; padding-right: 70px; }
     .conc-tag {
         font-size: 11px; padding: 3px 9px;
@@ -347,6 +380,28 @@
         color: rgba(255,255,255,0.9); white-space: nowrap;
     }
     .conc-tag b { color: #fff; font-weight: 700; }
+
+    .conc-detail-btn {
+        width: 100%; margin-top: 12px;
+        display: flex; justify-content: space-between; align-items: center;
+        padding: 8px 12px;
+        background: rgba(255,255,255,0.06);
+        border: 1px solid rgba(255,255,255,0.12);
+        border-radius: 9px;
+        color: rgba(255,255,255,0.85);
+        font-size: 11px; font-weight: 700;
+        font-family: inherit; cursor: pointer;
+        transition: background .2s;
+    }
+    .conc-detail-btn:hover { background: rgba(255,255,255,0.1); }
+    .conc-detail {
+        max-height: 0; overflow: hidden; opacity: 0;
+        transition: max-height .35s ease, opacity .25s ease;
+    }
+    .conc-detail.open { max-height: 320px; opacity: 1; margin-top: 10px; }
+    .conc-detail .backtest-note { color: rgba(255,255,255,.72); }
+    .conc-detail .backtest-note b { color: #fff; }
+
     .conc-footer {
         position: relative; z-index: 2;
         display: flex; justify-content: space-between; align-items: center;
@@ -360,6 +415,86 @@
         font-size: 10px; font-weight: 900; letter-spacing: 0.3px;
         border: 1px solid rgba(253,230,138,0.3);
     }
+
+    /* ===== 次级预测卡 ===== */
+    .sub-card {
+        margin: 0 16px 12px;
+        padding: 14px 16px 12px;
+        background: #FFFFFF;
+        border: 1px solid var(--line);
+        border-radius: 16px;
+        box-shadow: 0 2px 12px -8px rgba(0,0,0,0.18);
+        position: relative;
+    }
+    .sub-head { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
+    .sub-rank {
+        font-size: 10px; font-weight: 900; color: var(--primary);
+        background: rgba(29,78,216,0.08);
+        border: 1px solid rgba(29,78,216,.15);
+        padding: 2px 7px; border-radius: 6px;
+        font-family: "SF Mono", monospace;
+        flex-shrink: 0;
+    }
+    .sub-title { font-size: 13px; font-weight: 800; color: var(--text); flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .sub-count { font-size: 10px; color: var(--dim); font-family: "SF Mono", monospace; flex-shrink: 0; }
+    .sub-value {
+        font-family: "SF Mono", monospace;
+        font-size: 17px; font-weight: 900;
+        color: var(--danger); letter-spacing: -0.3px;
+        margin-bottom: 10px; word-break: break-all;
+        line-height: 1.25;
+    }
+    .sub-stats {
+        display: grid;
+        grid-template-columns: repeat(5, 1fr);
+        gap: 5px;
+        margin-bottom: 10px;
+    }
+    .sub-stats > div {
+        background: #FAFAF8;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        padding: 6px 2px;
+        text-align: center;
+        min-width: 0;
+    }
+    .sub-stats span {
+        display: block; font-size: 9px; color: var(--dim);
+        margin-bottom: 3px; white-space: nowrap;
+    }
+    .sub-stats b {
+        font-size: 12px; font-family: "SF Mono", monospace;
+        font-weight: 900; color: var(--text);
+        display: block; overflow: hidden; text-overflow: ellipsis;
+    }
+    .detail-mini-btn {
+        width: 100%;
+        display: flex; justify-content: space-between; align-items: center;
+        padding: 7px 10px;
+        background: #FAFAF8;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        font-size: 11px; color: var(--text-2); font-weight: 700;
+        cursor: pointer; font-family: inherit;
+        transition: background .15s;
+    }
+    .detail-mini-btn:hover { background: #F2F2EF; }
+    .sub-detail {
+        max-height: 0; overflow: hidden; opacity: 0;
+        transition: max-height .35s ease, opacity .25s ease;
+    }
+    .sub-detail.open { max-height: 300px; opacity: 1; margin-top: 8px; }
+
+    .backtest-strip { display: flex; flex-wrap: wrap; gap: 3px; }
+    .backtest-strip i { width: 9px; height: 9px; border-radius: 2px; display: block; }
+    .backtest-strip i.hit { background: var(--success); }
+    .backtest-strip i.miss { background: var(--danger); opacity: .85; }
+    .backtest-note {
+        font-size: 10px; color: var(--dim);
+        font-family: "SF Mono", monospace;
+        margin-top: 6px; line-height: 1.6;
+    }
+    .backtest-note b { color: var(--text-2); font-weight: 800; }
 
     .detail-section { padding: 0 16px 16px; position: relative; }
     .detail-toggle {
@@ -375,22 +510,24 @@
 
     .detail-list {
         max-height: 0; overflow: hidden;
-        transition: max-height 0.45s cubic-bezier(0.2, 0, 0.1, 1), opacity 0.3s ease;
+        transition: max-height 0.6s cubic-bezier(0.2, 0, 0.1, 1), opacity 0.3s ease;
         opacity: 0; padding-top: 0;
     }
-    .detail-list.open { max-height: 3000px; opacity: 1; padding-top: 12px; }
+    .detail-list.open { max-height: 6000px; opacity: 1; padding-top: 12px; }
 
     .kill-list { display: flex; flex-direction: column; gap: 8px; }
     .kill-item {
         display: flex; justify-content: space-between; align-items: center;
+        gap: 10px;
         padding: 14px 16px; background: var(--card);
         border: 1px solid var(--line); border-radius: 14px;
         transition: border-color 0.2s, background 0.2s;
     }
     .kill-item.core { border-left: 3px solid var(--accent); background: var(--accent-bg); border-color: var(--accent-line); border-left-color: var(--accent); }
     .kill-item.low { opacity: 0.55; }
+    .kill-item.selected { border-color: var(--primary); background: #F0F5FF; }
     .kill-info { flex: 1; min-width: 0; padding-right: 10px; }
-    
+
     .kill-title {
         font-size: 13px; font-weight: 700; color: var(--text);
         margin-bottom: 8px; display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
@@ -398,7 +535,7 @@
     .kill-title .rank-dot { display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: var(--line-strong); margin-right: 2px; flex-shrink: 0; }
     .kill-item.core .rank-dot { background: var(--accent); }
     .intersect-badge { font-size: 10px; background: rgba(29,78,216,0.08); color: var(--primary); padding: 1px 6px; border-radius: 4px; font-weight: 700; letter-spacing: 0.3px; }
-    
+
     .kill-stat { 
         font-size: 10px; color: var(--text-2); font-family: "SF Mono", monospace; 
         display: flex; flex-wrap: wrap; gap: 4px 8px; align-items: center;
@@ -408,7 +545,7 @@
     .stat-hit { color: var(--success); font-weight: 700; }
     .stat-loss { color: var(--danger); font-weight: 700; }
     .stat-rate { font-weight: 800; }
-    
+
     .kill-value {
         font-family: "SF Mono", "JetBrains Mono", monospace;
         font-size: 18px; font-weight: 900; color: var(--danger);
@@ -418,6 +555,129 @@
     }
     .kill-value.small-text { font-size: 15px; letter-spacing: -0.5px; }
     .kill-item.core .kill-value { color: var(--accent); }
+
+    /* ========== 组合过滤工具样式 ========== */
+    .kill-checkbox { flex-shrink: 0; display: flex; align-items: center; cursor: pointer; }
+    .kill-checkbox-input { display: none; }
+    .kill-checkbox-mark {
+        width: 18px; height: 18px; border-radius: 5px;
+        border: 1.5px solid var(--line-strong); background: #fff;
+        position: relative; transition: all 0.15s;
+    }
+    .kill-checkbox-input:checked + .kill-checkbox-mark {
+        background: var(--primary); border-color: var(--primary);
+    }
+    .kill-checkbox-input:checked + .kill-checkbox-mark::after {
+        content: '✓'; position: absolute; inset: 0;
+        color: #fff; font-size: 12px; font-weight: 900;
+        display: flex; align-items: center; justify-content: center;
+    }
+
+    .combo-panel {
+        margin-top: 14px;
+        padding: 16px;
+        background: linear-gradient(135deg, #F8FAFF 0%, #EFF6FF 100%);
+        border: 1px solid rgba(29,78,216,0.18);
+        border-radius: 16px;
+    }
+    .combo-panel-header {
+        display: flex; justify-content: space-between; align-items: center;
+        margin-bottom: 12px;
+    }
+    .combo-panel-title { font-size: 13px; font-weight: 900; color: var(--primary-deep); letter-spacing: 0.3px; }
+    .combo-selected-count {
+        font-size: 11px; color: var(--primary); font-family: "SF Mono", monospace;
+        background: rgba(29,78,216,0.1); padding: 3px 9px; border-radius: 999px; font-weight: 700;
+    }
+    .combo-toolbar { display: flex; gap: 6px; margin-bottom: 12px; flex-wrap: wrap; }
+    .combo-btn {
+        flex: 1; min-width: 70px;
+        padding: 8px 10px;
+        background: #fff;
+        border: 1px solid rgba(29,78,216,0.25);
+        color: var(--primary);
+        border-radius: 9px;
+        font-size: 11px; font-weight: 800;
+        cursor: pointer; font-family: inherit;
+        transition: all 0.15s;
+        white-space: nowrap;
+    }
+    .combo-btn:hover { background: #DBEAFE; }
+    .combo-btn:active { transform: scale(0.96); }
+    .combo-btn.primary { background: var(--primary); color: #fff; border-color: var(--primary); }
+    .combo-btn.primary:hover { background: var(--primary-mid); }
+
+    .combo-result {
+        background: #fff;
+        border-radius: 12px;
+        padding: 12px;
+        border: 1px dashed rgba(29,78,216,0.25);
+        min-height: 60px;
+    }
+    .combo-summary { font-size: 11px; color: var(--text-2); font-family: "SF Mono", monospace; margin-bottom: 10px; line-height: 1.8; }
+    .combo-summary b { color: var(--primary-deep); font-weight: 800; }
+    .combo-summary .hit-rate { color: var(--success); font-size: 13px; font-weight: 900; }
+    .result-balls { display: flex; flex-wrap: wrap; gap: 4px; }
+    .result-ball {
+        display: inline-flex; align-items: center; justify-content: center;
+        width: 26px; height: 26px; border-radius: 50%;
+        font-size: 11px; font-weight: 900;
+        font-family: "SF Mono", monospace;
+        color: #fff; text-shadow: 1px 1px 1px rgba(0,0,0,0.5);
+        box-shadow: inset -1px -1px 3px rgba(0,0,0,0.4), inset 1px 1px 2px rgba(255,255,255,0.3);
+    }
+    .combo-copy-btn {
+        width: 100%; margin-top: 12px; padding: 10px;
+        background: var(--primary); color: #fff;
+        border: none; border-radius: 10px;
+        font-size: 12px; font-weight: 800;
+        font-family: inherit; cursor: pointer;
+        transition: background .15s, transform .12s;
+        box-shadow: 0 3px 10px -4px rgba(29,78,216,.6);
+    }
+    .combo-copy-btn:hover { background: var(--primary-mid); }
+    .combo-copy-btn:active { transform: scale(0.98); }
+
+    .combo-rec-header {
+        margin-top: 14px; margin-bottom: 8px;
+        font-size: 12px; font-weight: 900; color: var(--primary-deep);
+        display: flex; align-items: center; gap: 6px;
+    }
+    .combo-rec-list { display: flex; flex-direction: column; gap: 6px; }
+    .combo-rec-item {
+        display: flex; align-items: center; gap: 10px;
+        padding: 10px 12px;
+        background: #fff;
+        border: 1px solid var(--line);
+        border-radius: 11px;
+        cursor: pointer;
+        transition: all 0.15s;
+    }
+    .combo-rec-item:hover { border-color: var(--primary); background: #F0F5FF; transform: translateY(-1px); }
+    .combo-rec-item:active { transform: scale(0.99); }
+    .combo-rec-rank {
+        font-size: 11px; font-weight: 900; color: var(--primary);
+        background: rgba(29,78,216,0.1);
+        padding: 3px 8px; border-radius: 6px;
+        font-family: "SF Mono", monospace;
+        flex-shrink: 0;
+    }
+    .combo-rec-info { flex: 1; min-width: 0; }
+    .combo-rec-name {
+        font-size: 11px; font-weight: 700; color: var(--text);
+        margin-bottom: 3px;
+        overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+    .combo-rec-meta {
+        font-size: 10px; color: var(--dim);
+        font-family: "SF Mono", monospace;
+    }
+    .combo-rec-meta b { color: var(--success); font-weight: 800; }
+    .combo-rec-apply {
+        font-size: 10px; color: #fff; font-weight: 800;
+        background: var(--primary); padding: 4px 10px; border-radius: 7px;
+        flex-shrink: 0;
+    }
 
     .vip-blur { filter: blur(6px); pointer-events: none; user-select: none; }
     .vip-overlay {
@@ -528,8 +788,8 @@
     <div class="terminal-container">
         <div class="topbar">
             <div class="brand">
-                <span class="main-name">鹰眼通智能剥离器</span>
-                <span class="sub-name">新澳六合彩</span>
+                <span class="main-name">鹰眼通</span>
+                <span class="sub-name">组合过滤剥离器 v2.8</span>
             </div>
             <div class="status-indicator">LIVE</div>
         </div>
@@ -572,6 +832,18 @@
             </div>
         </div>
 
+        <!-- ===== 预测卡数量自定义 ===== -->
+        <div class="cardcount-row">
+            <span class="cc-label">🃏 预测卡数量</span>
+            <div class="cc-pills" id="ccPills">
+                <button class="cc-pill" data-n="1">1</button>
+                <button class="cc-pill" data-n="2">2</button>
+                <button class="cc-pill active" data-n="3">3</button>
+                <button class="cc-pill" data-n="5">5</button>
+                <button class="cc-pill" data-n="8">8</button>
+            </div>
+        </div>
+
         <div class="action-row">
             <button class="btn-execute" id="btnScan" onclick="startScan()">
                 执行智能剥离 <span class="arrow">→</span>
@@ -581,6 +853,7 @@
             </button>
         </div>
 
+        <!-- ===== 主预测卡（排名第 1） ===== -->
         <div class="conclusion-card" id="conclusionCard">
             <div class="conc-radar">
                 <div class="conc-radar-sweep"></div>
@@ -599,21 +872,58 @@
                     <span>回测胜率 <b id="concRate">--</b></span>
                     <span>命中 <b id="concHits">--</b></span>
                 </div>
+                <div class="conc-extra" id="concExtra">
+                    <span>最大连对 <b id="concMaxWin">--</b></span>
+                    <span>最大连黑 <b id="concMaxLoss">--</b></span>
+                    <span>当前连对 <b id="concCurWin">--</b></span>
+                </div>
                 <div class="conc-tags" id="concTags"></div>
+                <button class="conc-detail-btn" id="concDetailBtn" onclick="toggleMainDetail()">
+                    <span>📈 历史回测明细</span><span class="toggle-arrow" id="concDetailArrow">▾</span>
+                </button>
+                <div class="conc-detail" id="concDetail"></div>
             </div>
             <div class="conc-footer">
-                <span class="conc-watermark">📢本数据由鹰眼通•智能剥离器统计预测 </span>
+                <span class="conc-watermark">📢 本数据由鹰眼通智能剥离器演算分析统计</span>
                 <span id="concPeriod">第 -- 期</span>
             </div>
         </div>
 
+        <!-- ===== 次级预测卡容器 ===== -->
+        <div id="subCardsContainer"></div>
+
         <div class="detail-section">
             <button class="detail-toggle" id="detailToggle" onclick="toggleDetail()">
-                <span>全部 12 项明细</span>
+                <span>全部 12 项明细 · 支持勾选组合过滤</span>
                 <span class="toggle-arrow">▾</span>
             </button>
             <div class="detail-list" id="detailList">
                 <div class="kill-list" id="killList"></div>
+
+                <!-- ===== 组合过滤工具 ===== -->
+                <div class="combo-panel" id="comboPanel">
+                    <div class="combo-panel-header">
+                        <span class="combo-panel-title">🎯 组合过滤 · 交叉出纯号码</span>
+                        <span class="combo-selected-count" id="comboSelectedCount">已选 0 项</span>
+                    </div>
+                    <div class="combo-toolbar">
+                        <button class="combo-btn" onclick="recommendTop(5)">推荐 Top5</button>
+                        <button class="combo-btn" onclick="recommendTop(10)">推荐 Top10</button>
+                        <button class="combo-btn" onclick="clearCombo()">清空</button>
+                        <button class="combo-btn primary" onclick="executeComboFilter()">交叉过滤</button>
+                    </div>
+                    <div class="combo-result" id="comboResult">
+                        <div style="color:var(--dim);font-size:12px;text-align:center;padding:14px 0;">
+                            请在上方勾选杀项，或点击「推荐 Top5 / Top10」自动筛选
+                        </div>
+                    </div>
+                    <div class="combo-rec-header">💡 智能推荐组合 · 胜率排名前 8</div>
+                    <div class="combo-rec-list" id="comboRecommendList">
+                        <div style="color:var(--dim);font-size:12px;text-align:center;padding:8px;">计算中...</div>
+                    </div>
+                </div>
+                <!-- ===== /组合过滤工具 ===== -->
+
             </div>
             <div class="vip-overlay" id="vipOverlay">
                 <div class="vip-title">🔒 双数期专属加密</div>
@@ -624,7 +934,7 @@
 
         <div class="footer-disclaimer">
             <div class="footer-meta">
-                <span>Matrix v2.6.6</span>
+                <span>Matrix v2.8.0</span>
                 <span>·</span>
                 <span>Rolling Window</span>
             </div>
@@ -675,6 +985,12 @@
         let currentReportData = null;
         const COOLDOWN_ZODIAC = 5;
         const COOLDOWN_NUM = 8;
+
+        // ===== 组合过滤全局状态 =====
+        let currentRenderList = [];
+        let currentTestLen = 1;
+        let comboSelected = new Set();
+        let isComboLocked = false;
 
         const sortDesc = (obj) => Object.keys(obj).sort((a,b) => obj[b] - obj[a]);
 
@@ -903,19 +1219,19 @@
             return selected;
         }
 
-        function copyToClipboard(text) {
+        function copyToClipboard(text, okMsg) {
             if (navigator.clipboard && window.isSecureContext) {
                 navigator.clipboard.writeText(text).then(() => {
-                    showToast('✅ 完整推文已复制，快去发帖吧！', 'success');
+                    showToast(okMsg || '✅ 已复制到剪贴板', 'success');
                 }).catch(() => {
-                    fallbackCopy(text);
+                    fallbackCopy(text, okMsg);
                 });
             } else {
-                fallbackCopy(text);
+                fallbackCopy(text, okMsg);
             }
         }
 
-        function fallbackCopy(text) {
+        function fallbackCopy(text, okMsg) {
             const textArea = document.createElement("textarea");
             textArea.value = text;
             textArea.style.position = "fixed";
@@ -925,13 +1241,423 @@
             textArea.select();
             try {
                 document.execCommand('copy');
-                showToast('✅ 完整推文已复制，快去发帖吧！', 'success');
+                showToast(okMsg || '✅ 已复制到剪贴板', 'success');
             } catch (err) {
                 showToast('❌ 复制失败，请手动截图', 'error');
             }
             document.body.removeChild(textArea);
         }
 
+        // ===== 生成回测明细条 =====
+        function buildStrip(seq, maxLen = 40) {
+            if (!seq || !seq.length) {
+                return '<div style="color:var(--dim);font-size:11px;text-align:center;padding:6px;">暂无回测数据</div>';
+            }
+            const arr = seq.slice(-maxLen);
+            const hits = arr.filter(x => x).length;
+            return `<div class="backtest-strip">${arr.map(x => `<i class="${x ? 'hit' : 'miss'}"></i>`).join('')}</div>
+                <div class="backtest-note">最近 ${arr.length} 期：命中 <b>${hits}</b> · 未中 <b>${arr.length - hits}</b>（左旧 → 右新）</div>`;
+        }
+
+        // ===== 预测卡数量 =====
+        function getCardCount() {
+            const active = document.querySelector('.cc-pill.active');
+            return active ? parseInt(active.dataset.n) : 1;
+        }
+
+        function toggleMainDetail() {
+            const el = document.getElementById('concDetail');
+            const arrow = document.getElementById('concDetailArrow');
+            if (!el) return;
+            el.classList.toggle('open');
+            if (arrow) arrow.style.transform = el.classList.contains('open') ? 'rotate(180deg)' : '';
+        }
+
+        function toggleSubDetail(id) {
+            const el = document.getElementById(id);
+            const arrow = document.getElementById(id + 'Arrow');
+            if (!el) return;
+            el.classList.toggle('open');
+            if (arrow) arrow.style.transform = el.classList.contains('open') ? 'rotate(180deg)' : '';
+        }
+
+        // ============================================================
+        //  结论预测卡渲染（主卡 + 次级卡）
+        // ============================================================
+        function renderConclusionCards() {
+            const d = currentReportData;
+            if (!d) return;
+
+            const primary = d.primary;
+            const testLen = d.testLen;
+            const locked = d.locked;
+            const sName = d.sName || '';
+            const nextPeriodNum = d.period;
+
+            const getRate = (hits) => ((hits / testLen) * 100).toFixed(1);
+
+            const concPeriod = document.getElementById('concPeriod');
+            const concValue = document.getElementById('concValue');
+            const concRate = document.getElementById('concRate');
+            const concHits = document.getElementById('concHits');
+            const concTags = document.getElementById('concTags');
+            const concLabelText = document.querySelector('.conc-label');
+            const concDetailBtn = document.getElementById('concDetailBtn');
+            const concDetail = document.getElementById('concDetail');
+            const concMaxWin = document.getElementById('concMaxWin');
+            const concMaxLoss = document.getElementById('concMaxLoss');
+            const concCurWin = document.getElementById('concCurWin');
+
+            concPeriod.innerText = `第 ${nextPeriodNum} 期`;
+
+            if (d.isAuto) {
+                concLabelText.innerHTML = `<span class="dot"></span> AI锁定最高：${primary.title.replace(/剥离$/,'')} (${sName} ${d.paramLen}期)`;
+            } else {
+                concLabelText.innerHTML = `<span class="dot"></span> 最高胜率项：${primary.title.replace(/剥离$/,'')}`;
+            }
+
+            if (locked) {
+                concValue.innerHTML = '<span style="opacity:.55; letter-spacing:6px;">🔒 🔒 🔒</span>';
+                concValue.classList.add('locked');
+                concRate.innerText = '--';
+                concHits.innerText = '--';
+                concMaxWin.innerText = '--';
+                concMaxLoss.innerText = '--';
+                concCurWin.innerText = '--';
+                concTags.innerHTML = '<span class="conc-tag">本期为双数期 · VIP 专享</span>';
+                concDetailBtn.style.display = 'none';
+                concDetail.classList.remove('open');
+                concDetail.innerHTML = '';
+                document.getElementById('subCardsContainer').innerHTML = '';
+                return;
+            }
+
+            concValue.classList.remove('locked');
+            concValue.innerText = primary.val.join(' · ');
+            concRate.innerText = getRate(primary.stats.hits) + '%';
+            concHits.innerText = `${primary.stats.hits}/${testLen}`;
+            concMaxWin.innerText = primary.stats.maxWin;
+            concMaxLoss.innerText = primary.stats.maxLoss;
+            concCurWin.innerText = primary.stats.curWin;
+
+            const others = d.list.filter(x => x !== primary).slice(0, 3);
+            concTags.innerHTML = others.map(x =>
+                `<span class="conc-tag">${x.title.replace(/剥离$/,'')} <b>${x.val.join(',')}</b></span>`
+            ).join('');
+
+            // 主卡回测明细
+            concDetailBtn.style.display = 'flex';
+            concDetail.innerHTML = buildStrip(primary.stats.seq || [], 50);
+            if (concDetail.classList.contains('open')) {
+                document.getElementById('concDetailArrow').style.transform = 'rotate(180deg)';
+            }
+
+            // ===== 次级预测卡 =====
+            const cardCount = getCardCount();
+            const subWrap = document.getElementById('subCardsContainer');
+            const subs = d.list.slice(1, cardCount);
+
+            if (subs.length === 0) {
+                subWrap.innerHTML = '';
+                return;
+            }
+
+            subWrap.innerHTML = subs.map((item, i) => {
+                const hits = item.stats.hits;
+                const rate = getRate(hits);
+                const rateColor = rate >= 90 ? 'var(--success)' : (rate >= 80 ? 'var(--accent)' : 'var(--danger)');
+
+                let countLabel = `杀${d.count}`;
+                if (item.isF5) countLabel = '杀5码';
+                if (item.isF10) countLabel = '杀10码';
+
+                const uid = 'subDetail' + i;
+
+                return `
+                <div class="sub-card">
+                    <div class="sub-head">
+                        <span class="sub-rank">#${i + 2}</span>
+                        <span class="sub-title">${item.title}</span>
+                        <span class="sub-count">${countLabel}</span>
+                    </div>
+                    <div class="sub-value">${item.val.join(' · ')}</div>
+                    <div class="sub-stats">
+                        <div><span>胜率</span><b style="color:${rateColor}">${rate}%</b></div>
+                        <div><span>命中</span><b>${hits}/${testLen}</b></div>
+                        <div><span>最大连对</span><b>${item.stats.maxWin}</b></div>
+                        <div><span>最大连黑</span><b style="color:var(--danger)">${item.stats.maxLoss}</b></div>
+                        <div><span>当前连对</span><b style="color:var(--success)">${item.stats.curWin}</b></div>
+                    </div>
+                    <button class="detail-mini-btn" onclick="toggleSubDetail('${uid}')">
+                        <span>📈 历史回测明细</span>
+                        <span class="toggle-arrow" id="${uid}Arrow">▾</span>
+                    </button>
+                    <div class="sub-detail" id="${uid}">
+                        ${buildStrip(item.stats.seq || [], 40)}
+                    </div>
+                </div>`;
+            }).join('');
+        }
+
+        // ============================================================
+        //  组合过滤核心函数
+        // ============================================================
+        function getNumbersForItem(title, val) {
+            const nums = new Set();
+            if (!val || !val.length) return [];
+
+            if (title.includes('生肖')) {
+                val.forEach(z => (zodiacToNumbers[z] || []).forEach(n => nums.add(n)));
+            } else if (title.includes('头数单双')) {
+                val.forEach(hp => {
+                    const m = String(hp).match(/^(\d)头(单|双)$/);
+                    if (!m) return;
+                    const head = parseInt(m[1]);
+                    for (let n = head*10; n <= head*10+9 && n <= 49; n++) {
+                        if (n < 1) continue;
+                        const isOdd = n % 2 !== 0;
+                        if ((m[2] === '单' && isOdd) || (m[2] === '双' && !isOdd)) nums.add(n);
+                    }
+                });
+            } else if (title.includes('头数')) {
+                val.forEach(h => {
+                    const head = parseInt(h);
+                    if (isNaN(head)) return;
+                    for (let n = head*10; n <= head*10+9 && n <= 49; n++) {
+                        if (n > 0) nums.add(n);
+                    }
+                });
+            } else if (title.includes('尾数')) {
+                val.forEach(t => {
+                    const tail = parseInt(t);
+                    if (isNaN(tail)) return;
+                    for (let n = tail; n <= 49; n += 10) {
+                        if (n > 0) nums.add(n);
+                    }
+                });
+            } else if (title.includes('半波')) {
+                for (let n = 1; n <= 49; n++) {
+                    if (val.includes(getHalfWave(n))) nums.add(n);
+                }
+            } else if (title.includes('合数')) {
+                val.forEach(s => (sumMap[s] || []).forEach(n => nums.add(n)));
+            } else if (title.includes('门数')) {
+                val.forEach(d => (doorMap[d] || []).forEach(n => nums.add(n)));
+            } else if (title.includes('段位')) {
+                val.forEach(s => (segMap[s] || []).forEach(n => nums.add(n)));
+            } else if (title.includes('合尾')) {
+                for (let n = 1; n <= 49; n++) {
+                    if (val.includes(getTailSum(n))) nums.add(n);
+                }
+            } else if (title.includes('五行')) {
+                val.forEach(wx => (wuXingMap[wx] || []).forEach(n => nums.add(n)));
+            } else if (title.includes('号码') || title.includes('覆盖')) {
+                val.forEach(v => {
+                    const n = typeof v === 'number' ? v : parseInt(v);
+                    if (n >= 1 && n <= 49) nums.add(n);
+                });
+            }
+            return [...nums].sort((a,b) => a-b);
+        }
+
+        function onComboCheckChange() {
+            const cbs = document.querySelectorAll('.kill-checkbox-input');
+            comboSelected.clear();
+            cbs.forEach(cb => {
+                if (cb.checked) comboSelected.add(parseInt(cb.dataset.idx));
+                const item = cb.closest('.kill-item');
+                if (item) item.classList.toggle('selected', cb.checked);
+            });
+            updateComboResult();
+        }
+
+        function computeComboState() {
+            if (comboSelected.size === 0) return null;
+
+            const union = new Set();
+            let rateProduct = 1;
+            const names = [];
+
+            comboSelected.forEach(i => {
+                const item = currentRenderList[i];
+                if (!item) return;
+                (item.numSet || []).forEach(n => union.add(n));
+                const rate = currentTestLen > 0 ? (item.stats.hits / currentTestLen) : 0;
+                rateProduct *= rate;
+                names.push(item.title.replace(/剥离$/,''));
+            });
+
+            const remaining = [];
+            for (let n = 1; n <= 49; n++) if (!union.has(n)) remaining.push(n);
+
+            return {
+                names,
+                remaining,
+                union,
+                ratePct: (rateProduct * 100).toFixed(1)
+            };
+        }
+
+        function updateComboResult(silent) {
+            const countEl = document.getElementById('comboSelectedCount');
+            const resultEl = document.getElementById('comboResult');
+            if (!countEl || !resultEl) return;
+
+            countEl.textContent = `已选 ${comboSelected.size} 项`;
+
+            const state = computeComboState();
+            if (!state) {
+                resultEl.innerHTML = '<div style="color:var(--dim);font-size:12px;text-align:center;padding:14px 0;">请在上方勾选杀项，或点击「推荐 Top5 / Top10」自动筛选</div>';
+                return;
+            }
+
+            const ballsHtml = state.remaining.map(n => {
+                const cls = getWaveClass(n);
+                const s = n < 10 ? '0'+n : n;
+                return `<span class="result-ball ${cls}">${s}</span>`;
+            }).join('');
+
+            resultEl.innerHTML = `
+                <div class="combo-summary">
+                    <div>已杀组合：<b>${state.names.join(' + ')}</b></div>
+                    <div>估算组合胜率：<span class="hit-rate">${state.ratePct}%</span> &nbsp;·&nbsp; 剩余纯号码：<b>${state.remaining.length}</b> 个</div>
+                </div>
+                <div class="result-balls">${ballsHtml || '<span style="color:var(--danger);font-weight:700;font-size:12px;">⚠️ 全部杀光，请减少勾选</span>'}</div>
+                ${state.remaining.length ? '<button class="combo-copy-btn" onclick="copyComboResult()">📋 一键复制该结果</button>' : ''}
+            `;
+
+            if (!silent && state.remaining.length === 0) {
+                showToast('⚠️ 所选组合已杀完全部号码，请减少勾选', 'error');
+            }
+        }
+
+        function copyComboResult() {
+            const state = computeComboState();
+            if (!state) {
+                showToast('请先勾选杀项或生成组合结果', 'error');
+                return;
+            }
+            const d = currentReportData;
+            const period = d ? d.period : '--';
+            const balls = state.remaining.map(n => n < 10 ? '0'+n : n).join(' ');
+            const text =
+                `🎯【鹰眼通 · 组合过滤结果】第 ${period} 期\n\n` +
+                `🔗 已杀组合：${state.names.join(' + ')}\n` +
+                `📊 估算组合胜率：${state.ratePct}%\n` +
+                `✅ 剩余纯号码（${state.remaining.length} 个）：\n${balls || '无'}\n\n` +
+                `⚠️ 数据基于历史概率统计，仅供研究参考。`;
+            copyToClipboard(text, '✅ 组合过滤结果已复制');
+        }
+
+        function executeComboFilter() {
+            if (comboSelected.size === 0) {
+                showToast('请先勾选至少 1 项杀号', 'error');
+                return;
+            }
+            updateComboResult(true);
+            const el = document.getElementById('comboResult');
+            if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            showToast('✅ 交叉过滤完成，纯号码已生成', 'success');
+        }
+
+        function generateCombos() {
+            const n = currentRenderList.length;
+            if (n < 2 || currentTestLen <= 0) return [];
+
+            const numSets = currentRenderList.map(it => new Set(it.numSet || []));
+            const rates = currentRenderList.map(it => it.stats.hits / currentTestLen);
+            const combos = [];
+
+            const enumerate = (k) => {
+                const idxs = [];
+                const dfs = (start, depth) => {
+                    if (depth === k) {
+                        const union = new Set();
+                        for (let i = 0; i < idxs.length; i++) {
+                            numSets[idxs[i]].forEach(x => union.add(x));
+                        }
+                        const remainCount = 49 - union.size;
+                        if (remainCount < 8) return;
+                        let rate = 1;
+                        for (let i = 0; i < idxs.length; i++) rate *= rates[idxs[i]];
+                        combos.push({ idxs: [...idxs], rate: rate * 100, remainCount });
+                        return;
+                    }
+                    for (let i = start; i <= n - (k - depth); i++) {
+                        idxs.push(i);
+                        dfs(i + 1, depth + 1);
+                        idxs.pop();
+                    }
+                };
+                dfs(0, 0);
+            };
+
+            enumerate(2);
+            enumerate(3);
+            enumerate(4);
+
+            combos.sort((a, b) => b.rate - a.rate);
+            return combos.slice(0, 8);
+        }
+
+        function renderComboRecommendation() {
+            const listEl = document.getElementById('comboRecommendList');
+            if (!listEl) return;
+
+            if (isComboLocked) {
+                listEl.innerHTML = '<div style="color:var(--dim);font-size:12px;text-align:center;padding:10px;">🔒 VIP 解锁后可查看推荐组合</div>';
+                return;
+            }
+
+            const combos = generateCombos();
+            if (combos.length === 0) {
+                listEl.innerHTML = '<div style="color:var(--dim);font-size:12px;text-align:center;padding:10px;">暂无可用组合</div>';
+                return;
+            }
+
+            listEl.innerHTML = combos.map((c, i) => {
+                const names = c.idxs.map(idx => currentRenderList[idx].title.replace(/剥离$/,'')).join(' + ');
+                return `<div class="combo-rec-item" onclick="applyCombo([${c.idxs.join(',')}])">
+                    <div class="combo-rec-rank">#${i+1}</div>
+                    <div class="combo-rec-info">
+                        <div class="combo-rec-name">${names}</div>
+                        <div class="combo-rec-meta">估算胜率 <b>${c.rate.toFixed(1)}%</b> · 剩余 <b>${c.remainCount}</b> 码</div>
+                    </div>
+                    <div class="combo-rec-apply">应用</div>
+                </div>`;
+            }).join('');
+        }
+
+        function applyCombo(idxs) {
+            const idSet = new Set(idxs.map(Number));
+            document.querySelectorAll('.kill-checkbox-input').forEach(cb => {
+                const idx = parseInt(cb.dataset.idx);
+                const checked = idSet.has(idx);
+                cb.checked = checked;
+                const item = cb.closest('.kill-item');
+                if (item) item.classList.toggle('selected', checked);
+            });
+            onComboCheckChange();
+            showToast('✅ 已应用推荐组合', 'success');
+        }
+
+        function recommendTop(k) {
+            if (!currentRenderList.length) { showToast('暂无数据', 'error'); return; }
+            const sorted = currentRenderList
+                .map((it, idx) => ({ idx, rate: it.stats.hits / currentTestLen }))
+                .sort((a, b) => b.rate - a.rate);
+            const idxs = sorted.slice(0, k).map(x => x.idx);
+            applyCombo(idxs);
+            showToast(`✅ 已自动勾选胜率 Top${idxs.length}`, 'success');
+        }
+
+        function clearCombo() {
+            applyCombo([]);
+        }
+
+        // ============================================================
+        //  分享复制
+        // ============================================================
         function generateShareReport() {
             if (!currentReportData) {
                 showToast('请先执行剥离计算再复制', 'error');
@@ -941,38 +1667,61 @@
             let text = '';
 
             if (d.locked) {
-                text = `🔒【鹰眼通 AI 演算•大数据】第 ${d.period} 期\n\n系统检测到本期触发核心加密保护机制。\n🔥 高位剥离数据仅限 VIP 专属查看。\n\n👉 升级 VIP 解锁精准杀号与算法模型。\n#黑曜士AI #量化预测 #数据加密`;
-            } else {
-                const primary = d.primary;
-                const primaryRate = ((primary.stats.hits / d.testLen) * 100).toFixed(1);
-                
-                let listText = '';
-                d.list.forEach((item, index) => {
-                    const hits = item.stats.hits;
-                    const rate = ((hits / d.testLen) * 100).toFixed(1);
-                    
-                    let countLabel = `杀${d.count}`;
-                    if(item.isF5) countLabel = "杀5码";
-                    if(item.isF10) countLabel = "杀10码";
-                    
-                    listText += `${index + 1}. 【${item.title.replace(/剥离$/,'')}】(${countLabel})\n`;
-                    listText += `🎯 杀号：${item.val.join(', ')}\n`;
-                    listText += `📊 胜率：${rate}% (${hits}/${d.testLen}) | 最高连对：${item.stats.maxWin} | 最大连黑：${item.stats.maxLoss} | 当前连对：${item.stats.curWin}\n`;
-                    listText += `───────────────\n`;
-                });
-
-                text = `🔥【鹰眼通 AI 演算•大数据】第 ${d.period} 期高危剥离报告\n\n` +
-                       `⚙️ 算法引擎：多因子滚动窗口回测 (近 ${d.testLen} 期)\n` +
-                       `🧠 策略模型：${d.strategyName}\n\n` +
-                       `🌟 胜率最高项：${primary.title.replace(/剥离$/,'')} -> ${primary.val.join(', ')} (胜率 ${primaryRate}%)\n\n` +
-                       `📌 全维剥离矩阵如下：\n\n` +
-                       listText +
-                       `\n⚠️ 数据基于历史概率统计，仅供研究参考。\n` +
-                       `💬 长期稳定验证 / 解锁高级算法，请联系客服。`;
+                text = `🔒【鹰眼通 AI 演算•大数据】第 ${d.period} 期\n\n系统检测到本期触发核心加密保护机制。\n🔥 高位剥离数据仅限 VIP 专属查看。\n\n👉 升级 VIP 解锁精准杀号与算法模型。\n#鹰眼通AI #量化预测 #数据加密`;
+                copyToClipboard(text, '✅ 已复制加密提示');
+                return;
             }
-            copyToClipboard(text);
+
+            const cardCount = getCardCount();
+            const cards = d.list.slice(0, cardCount);
+
+            let cardText = '';
+            cards.forEach((item, i) => {
+                const hits = item.stats.hits;
+                const rate = ((hits / d.testLen) * 100).toFixed(1);
+
+                let countLabel = `杀${d.count}`;
+                if (item.isF5) countLabel = '杀5码';
+                if (item.isF10) countLabel = '杀10码';
+
+                cardText += `【${i + 1}】${item.title.replace(/剥离$/,'')} (${countLabel})\n`;
+                cardText += `🎯 杀号：${item.val.join(', ')}\n`;
+                cardText += `📊 胜率 ${rate}% | 命中 ${hits}/${d.testLen}\n`;
+                cardText += `🔁 最大连对 ${item.stats.maxWin} | 最大连黑 ${item.stats.maxLoss} | 当前连对 ${item.stats.curWin}\n`;
+                cardText += `───────────────\n`;
+            });
+
+            // 组合过滤结果
+            let comboText = '';
+            const comboState = computeComboState();
+            if (comboState) {
+                const balls = comboState.remaining.map(n => n < 10 ? '0'+n : n).join(' ');
+                comboText =
+                    `\n🎯【组合过滤结果】\n` +
+                    `🔗 已杀组合：${comboState.names.join(' + ')}\n` +
+                    `📊 估算组合胜率：${comboState.ratePct}%\n` +
+                    `✅ 剩余纯号码（${comboState.remaining.length} 个）：\n${balls || '无'}\n`;
+            }
+
+            const primary = d.primary;
+            const primaryRate = ((primary.stats.hits / d.testLen) * 100).toFixed(1);
+
+            text = `🔥【鹰眼通 AI 演算•大数据】第 ${d.period} 期高危剥离报告\n\n` +
+                   `⚙️ 算法引擎：多因子滚动窗口回测 (近 ${d.testLen} 期)\n` +
+                   `🧠 策略模型：${d.strategyName}\n\n` +
+                   `🌟 胜率最高项：${primary.title.replace(/剥离$/,'')} -> ${primary.val.join(', ')} (胜率 ${primaryRate}%)\n\n` +
+                   `📌 预测卡 TOP${cards.length} 明细：\n\n` +
+                   cardText +
+                   comboText +
+                   `\n⚠️ 数据基于历史概率统计，仅供研究参考。\n` +
+                   `💬 长期稳定验证 / 解锁高级算法，请联系客服TG✈️@neyetone。`;
+
+            copyToClipboard(text, '✅ 完整推文已复制，快去发帖吧！');
         }
 
+        // ============================================================
+        //  数据抓取
+        // ============================================================
         async function startScan() {
             const btn = document.getElementById('btnScan');
             const modal = document.getElementById('calcModal');
@@ -1143,8 +1892,13 @@
             return { bestStrategy, bestPeriod, bestRate: bestRate.toFixed(1) };
         }
 
+        // ============================================================
+        //  主渲染逻辑
+        // ============================================================
         function renderDashboard() {
             if (SEQ.length === 0) return;
+
+            comboSelected.clear();
 
             let strategy = isVIP ? document.getElementById('selStrategy').value : 'miss';
             let testLen = isVIP ? parseInt(document.getElementById('selPeriod').value) : 50;
@@ -1175,20 +1929,12 @@
             const nextPeriodNum = parseInt(SEQ[SEQ.length - 1].period.replace(/\D/g, '')) + 1;
             const isEvenPeriod = nextPeriodNum % 2 === 0;
 
-            let stats = {
-                kz: { hits: 0, maxWin: 0, curWin: 0, curLoss: 0, maxLoss: 0 }, 
-                kt: { hits: 0, maxWin: 0, curWin: 0, curLoss: 0, maxLoss: 0 }, 
-                khead: { hits: 0, maxWin: 0, curWin: 0, curLoss: 0, maxLoss: 0 },
-                khalf: { hits: 0, maxWin: 0, curWin: 0, curLoss: 0, maxLoss: 0 }, 
-                ksum: { hits: 0, maxWin: 0, curWin: 0, curLoss: 0, maxLoss: 0 }, 
-                kdoor: { hits: 0, maxWin: 0, curWin: 0, curLoss: 0, maxLoss: 0 },
-                kseg: { hits: 0, maxWin: 0, curWin: 0, curLoss: 0, maxLoss: 0 }, 
-                kwuxing: { hits: 0, maxWin: 0, curWin: 0, curLoss: 0, maxLoss: 0 }, 
-                ktailsum: { hits: 0, maxWin: 0, curWin: 0, curLoss: 0, maxLoss: 0 },
-                kheadparity: { hits: 0, maxWin: 0, curWin: 0, curLoss: 0, maxLoss: 0 }, 
-                kn5: { hits: 0, maxWin: 0, curWin: 0, curLoss: 0, maxLoss: 0 }, 
-                kn10: { hits: 0, maxWin: 0, curWin: 0, curLoss: 0, maxLoss: 0 }
-            };
+            // ===== 统计对象（含回测序列） =====
+            const statKeys = ['kz','kt','khead','khalf','ksum','kdoor','kseg','kwuxing','ktailsum','kheadparity','kn5','kn10'];
+            const stats = {};
+            statKeys.forEach(k => {
+                stats[k] = { hits: 0, maxWin: 0, curWin: 0, curLoss: 0, maxLoss: 0, seq: [] };
+            });
 
             let histKZ = [], histKT = [], histKHead = [], histKHalf = [], histKSum = [], histKDoor = [], histKSeg = [],
                 histKWuXing = [], histKTailSum = [], histKHeadParity = [], histKN5 = [], histKN10 = [];
@@ -1249,6 +1995,7 @@
                 const realHeadParity = getHeadParity(real);
 
                 const updateStat = (key, isHit) => {
+                    stats[key].seq.push(isHit ? 1 : 0);
                     if(isHit) {
                         stats[key].hits++;
                         stats[key].curWin++;
@@ -1311,49 +2058,20 @@
                 { title: "重火力覆盖", val: nextKN10, stats: stats.kn10, isF5: false, isF10: true, isInt: true }
             ];
 
-            // 核心排序：按胜率从高到低
             renderList.sort((a, b) => parseFloat(getRate(b.stats.hits)) - parseFloat(getRate(a.stats.hits)));
 
-            // ⭐ 关键修改：提取第一名作为结论卡的主角
+            renderList.forEach(item => {
+                item.numSet = getNumbersForItem(item.title, item.val);
+            });
+
+            currentRenderList = renderList;
+            currentTestLen = actualTestLen;
+
             const primary = renderList[0];
             const locked = isEvenPeriod && !isVIP;
-
-            const concPeriod = document.getElementById('concPeriod');
-            const concValue = document.getElementById('concValue');
-            const concRate = document.getElementById('concRate');
-            const concHits = document.getElementById('concHits');
-            const concTags = document.getElementById('concTags');
-            const concLabelText = document.querySelector('.conc-label');
-
-            concPeriod.innerText = `第 ${nextPeriodNum} 期`;
+            isComboLocked = locked;
 
             let sName = strategy === 'intersect' ? '三轨交集' : (strategy === 'combo' ? '双轨共振' : '极寒单轨');
-            
-            if (isAutoTriggered) {
-                concLabelText.innerHTML = `<span class="dot"></span> AI锁定最高：${primary.title.replace(/剥离$/,'')} (${sName} ${testLen}期)`;
-            } else {
-                concLabelText.innerHTML = `<span class="dot"></span> 最高胜率项：${primary.title.replace(/剥离$/,'')}`;
-            }
-
-            if (locked) {
-                concValue.innerHTML = '<span style="opacity:.55; letter-spacing:6px;">🔒 🔒 🔒</span>';
-                concValue.classList.add('locked');
-                concRate.innerText = '--';
-                concHits.innerText = '--';
-                concTags.innerHTML = '<span class="conc-tag">本期为双数期 · VIP 专享</span>';
-            } else {
-                concValue.classList.remove('locked');
-                concValue.innerText = primary.val.join(' · ');
-                concRate.innerText = getRate(primary.stats.hits) + '%';
-                concHits.innerText = `${primary.stats.hits}/${actualTestLen}`;
-
-                // 标签展示接下来的第 2、3、4 名
-                const others = renderList.filter(x => x !== primary).slice(0, 3);
-                concTags.innerHTML = others.map(x =>
-                    `<span class="conc-tag">${x.title.replace(/剥离$/,'')} <b>${x.val.join(',')}</b></span>`
-                ).join('');
-            }
-
             let strategyName = `${sName} ${testLen}期`;
             if (isAutoTriggered) {
                 strategyName = `AI智能寻优 (${sName} ${testLen}期)`;
@@ -1366,7 +2084,11 @@
                 primary: primary,
                 list: renderList,
                 locked: locked,
-                strategyName: strategyName
+                strategyName: strategyName,
+                sName: sName,
+                isAuto: isAutoTriggered,
+                strategy: strategy,
+                paramLen: testLen
             };
 
             const detailList = document.getElementById('detailList');
@@ -1381,6 +2103,7 @@
                 overlay.classList.remove('show');
             }
 
+            // ===== 12 项明细渲染 =====
             let html = '';
             renderList.forEach((item, idx) => {
                 const rate = parseFloat(getRate(item.stats.hits));
@@ -1399,7 +2122,11 @@
                 const smallTextClass = item.val.length >= 4 ? 'small-text' : '';
 
                 html += `
-                <div class="kill-item ${levelClass}">
+                <div class="kill-item ${levelClass}" data-idx="${idx}">
+                    <label class="kill-checkbox" onclick="event.stopPropagation()">
+                        <input type="checkbox" class="kill-checkbox-input" data-idx="${idx}" onchange="onComboCheckChange()">
+                        <span class="kill-checkbox-mark"></span>
+                    </label>
                     <div class="kill-info">
                         <div class="kill-title">
                             <span class="rank-dot"></span>
@@ -1421,65 +2148,30 @@
             });
 
             killList.innerHTML = html;
+
+            // ===== 结论卡 + 组合过滤 =====
+            renderConclusionCards();
+            renderComboRecommendation();
+            updateComboResult(true);
+        }
+
+        // ===== 预测卡数量切换 =====
+        function initCardCountPills() {
+            const pills = document.querySelectorAll('.cc-pill');
+            pills.forEach(btn => {
+                btn.addEventListener('click', function () {
+                    pills.forEach(b => b.classList.remove('active'));
+                    this.classList.add('active');
+                    renderConclusionCards();
+                });
+            });
         }
 
         window.onload = () => {
             initVIPUI();
+            initCardCountPills();
             startScan();
         };
     </script>
-<!-- Telegram 在线客服浮窗 -->
-<a
-  class="tg-float"
-  href="https://t.me/onyx668"
-  target="_blank"
-  rel="noopener"
-  aria-label="通过 Telegram 联系客服"
->
-  <!-- Telegram 纸飞机 SVG 图标 -->
-  <svg viewBox="0 0 24 24" width="24" height="24" fill="currentColor">
-    <path d="M9.78 18.65l.28-4.23 7.68-6.92c.34-.31-.07-.46-.52-.19L7.74 13.3 3.64 12c-.88-.25-.89-.86.2-1.3l15.97-6.16c.73-.33 1.43.18 1.15 1.3l-2.72 12.81c-.19.91-.74 1.13-1.5.71L12.6 16.3l-1.99 1.93c-.23.23-.42.42-.83.42z"/>
-  </svg>
-</a>
-
-<style>
-  .tg-float {
-    position: fixed;
-    right: 20px;
-    bottom: 20px;
-    z-index: 9999;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 56px;               /* 圆形按钮 */
-    height: 56px;
-    border-radius: 50%;
-    background-color: #229ED9; /* Telegram 品牌蓝 */
-    color: #ffffff;
-    text-decoration: none;
-    box-shadow: 0 8px 24px rgba(34, 158, 217, 0.35);
-    transition: transform 0.2s ease, box-shadow 0.2s ease;
-  }
-
-  .tg-float:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 12px 28px rgba(34, 158, 217, 0.45);
-  }
-
-  .tg-float:focus-visible {
-    outline: 3px solid #0f0f0f;
-    outline-offset: 3px;
-  }
-
-  /* 移动端稍微缩小，避免遮挡 */
-  @media (max-width: 640px) {
-    .tg-float {
-      right: 12px;
-      bottom: 12px;
-      width: 50px;
-      height: 50px;
-    }
-  }
-</style>
 </body>
 </html>
