@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-<title>鹰眼通 · 智能组合过滤剥离器 v2.8</title>
+<title>鹰眼通 · 组合过滤剥离器 v2.8</title>
 <style>
     :root {
         --primary: #1D4ED8;
@@ -169,7 +169,6 @@
         text-overflow: ellipsis;
     }
     .config-select:focus { border-color: var(--primary); background: #fff; }
-    .config-select:disabled { opacity: 0.55; cursor: not-allowed; }
     .config-pill::after {
         content: '';
         position: absolute;
@@ -695,6 +694,7 @@
         padding: 9px 22px; border-radius: 9px; font-size: 13px; font-weight: 800;
         cursor: pointer; font-family: inherit; box-shadow: 0 3px 10px -2px rgba(23,37,84,0.4);
     }
+    .btn-unlock:disabled { opacity: 0.7; cursor: wait; }
 
     .footer-disclaimer { font-size: 10px; color: var(--dim); text-align: center; padding: 4px 24px 20px; line-height: 1.7; background: var(--card); }
     .footer-meta { display: flex; justify-content: center; gap: 12px; font-size: 10px; color: var(--dim); font-family: "SF Mono", monospace; margin-bottom: 6px; opacity: 0.7; }
@@ -789,7 +789,7 @@
         <div class="topbar">
             <div class="brand">
                 <span class="main-name">鹰眼通</span>
-                <span class="sub-name">组合过滤剥离器 v2.8</span>
+                <span class="sub-name">组合过滤 v2.8</span>
             </div>
             <div class="status-indicator">LIVE</div>
         </div>
@@ -808,8 +808,8 @@
                 <select class="config-select" id="selStrategy">
                     <option value="auto">🤖 AI 智能寻优</option>
                     <option value="miss">极寒单轨</option>
-                    <option value="combo">双轨共振 [VIP]</option>
-                    <option value="intersect">三轨交集 [VIP]</option>
+                    <option value="combo">双轨共振</option>
+                    <option value="intersect">三轨交集</option>
                 </select>
             </div>
             <div class="config-pill">
@@ -946,13 +946,47 @@
         <div class="vip-modal-content">
             <div class="vip-modal-close" onclick="document.getElementById('vipModal').classList.remove('show')">×</div>
             <div style="color: var(--danger); font-size: 17px; font-weight: 900; margin-bottom: 10px;">🔒 升级 VIP 权限</div>
-            <div style="font-size: 12px; color: var(--dim); margin-bottom: 18px; line-height: 1.7;">免费用户仅支持【极寒单轨】·【50 期回测】·【杀 1 个】。<br>输入卡密解锁高级策略与更长周期。</div>
-            <input type="text" id="vipCardInput" class="vip-input" placeholder="请输入卡密">
-            <button class="btn-unlock" style="width: 100%; padding: 12px; font-size: 14px;" onclick="verifyCard()">立即验证并解锁</button>
+            <div style="font-size: 12px; color: var(--dim); margin-bottom: 18px; line-height: 1.7;">
+                单期数全部功能免费使用。<br>
+                双期数（偶数期）核心预测数据为 VIP 专享，<br>
+                输入卡密即可解锁。
+            </div>
+            <input type="text" id="vipCardInput" class="vip-input" placeholder="请输入卡密" autocomplete="off">
+            <button class="btn-unlock" style="width: 100%; padding: 12px; font-size: 14px;" id="vipVerifyBtn" onclick="verifyCard()">立即验证并解锁</button>
         </div>
     </div>
 
     <script>
+        // ============================================================
+        //  VIP 网络验证配置（已完美对齐你的 Worker 后端代码）
+        // ============================================================
+        const VIP_CONFIG = {
+            // 你的 Worker 实际处理验证的路径
+            apiUrl: 'https://winter-night-ffc5.vivibeauty01.workers.dev/verify',
+            method: 'GET',
+            
+            // 直接解析后端返回的 { ok: true/false, msg: "..." }
+            parseResponse: (data) => {
+                if (data && data.ok === true) {
+                    return { ok: true, token: 'vip-ok' };
+                }
+                return { ok: false, msg: (data && data.msg) ? data.msg : '卡密无效' };
+            },
+            tokenKey: 'quantum_vip_token',
+            deviceKey: 'quantum_device_id'
+        };
+
+        function getDeviceId() {
+            let id = localStorage.getItem(VIP_CONFIG.deviceKey);
+            if (!id) {
+                id = (crypto.randomUUID
+                    ? crypto.randomUUID()
+                    : 'dev-' + Date.now() + '-' + Math.random().toString(36).slice(2));
+                localStorage.setItem(VIP_CONFIG.deviceKey, id);
+            }
+            return id;
+        }
+
         function showToast(msg, type = 'error') {
             const toast = document.getElementById('customToast');
             const msgEl = document.getElementById('toastMsg');
@@ -981,12 +1015,24 @@
         function getHeadParity(n) { let head = Math.floor(n/10); let parity = (n%2 !== 0) ? "单" : "双"; return head + "头" + parity; }
 
         let SEQ = [];
-        let isVIP = localStorage.getItem('quantum_vip_auth') === 'true';
+
+        (function initVIPFromStorage() {
+            const storedToken = localStorage.getItem(VIP_CONFIG.tokenKey);
+            if (!storedToken) {
+                localStorage.removeItem('quantum_vip_auth');
+            }
+        })();
+        let isVIP = !!(localStorage.getItem(VIP_CONFIG.tokenKey));
+
         let currentReportData = null;
+
+        let currentNeedVIP = false;
+        let currentIsEvenPeriod = false;
+        let vipPromptShown = false;
+
         const COOLDOWN_ZODIAC = 5;
         const COOLDOWN_NUM = 8;
 
-        // ===== 组合过滤全局状态 =====
         let currentRenderList = [];
         let currentTestLen = 1;
         let comboSelected = new Set();
@@ -1020,55 +1066,72 @@
         }
 
         function initVIPUI() {
-            const selStrategy = document.getElementById('selStrategy');
-            const selPeriod = document.getElementById('selPeriod');
-            const selCount = document.getElementById('selCount');
-            const lockStrategy = document.getElementById('lockStrategy');
-            const lockPeriod = document.getElementById('lockPeriod');
-            const lockCount = document.getElementById('lockCount');
-
-            if (isVIP) {
-                selStrategy.disabled = false;
-                selPeriod.disabled = false;
-                selCount.disabled = false;
-                lockStrategy.style.display = 'none';
-                lockPeriod.style.display = 'none';
-                lockCount.style.display = 'none';
-            } else {
-                selStrategy.value = "miss";
-                selPeriod.value = "50";
-                selCount.value = "1";
-                lockStrategy.style.display = 'inline-block';
-                lockPeriod.style.display = 'inline-block';
-                lockCount.style.display = 'inline-block';
-            }
+            updateAccessUI(false);
         }
 
-        document.getElementById('selStrategy').addEventListener('change', function(e) {
-            if (!isVIP && this.value !== 'miss') { this.value = 'miss'; openVIP(); return; }
+        function updateAccessUI(isEvenPeriod) {
+            currentIsEvenPeriod = !!isEvenPeriod;
+            currentNeedVIP = currentIsEvenPeriod && !isVIP;
+            const display = currentNeedVIP ? 'inline-block' : 'none';
+            ['lockStrategy', 'lockPeriod', 'lockCount'].forEach(id => {
+                const el = document.getElementById(id);
+                if (el) el.style.display = display;
+            });
+        }
+
+        document.getElementById('selStrategy').addEventListener('change', function() {
             renderDashboard();
         });
-        document.getElementById('selPeriod').addEventListener('change', function(e) {
-            if (!isVIP && this.value !== '50') { this.value = '50'; openVIP(); return; }
+        document.getElementById('selPeriod').addEventListener('change', function() {
             renderDashboard();
         });
-        document.getElementById('selCount').addEventListener('change', function(e) {
-            if (!isVIP && this.value !== '1') { this.value = '1'; openVIP(); } else { renderDashboard(); }
+        document.getElementById('selCount').addEventListener('change', function() {
+            renderDashboard();
         });
 
         function openVIP() { document.getElementById('vipModal').classList.add('show'); }
 
-        function verifyCard() {
-            const val = document.getElementById('vipCardInput').value.trim();
-            if (val.length >= 6) {
-                isVIP = true;
-                localStorage.setItem('quantum_vip_auth', 'true');
-                document.getElementById('vipModal').classList.remove('show');
-                initVIPUI();
-                renderDashboard();
-                showToast('✅ VIP 验证成功，全部功能已解锁！', 'success');
-            } else {
-                showToast('❌ 卡密无效或长度不足', 'error');
+        // ===== 完全匹配后端 Worker 的验证请求 =====
+        async function verifyCard() {
+            const input = document.getElementById('vipCardInput');
+            const btn = document.getElementById('vipVerifyBtn');
+            const val = (input.value || '').trim();
+
+            if (!val) { showToast('请输入卡密', 'error'); return; }
+
+            const oldText = btn.textContent;
+            btn.disabled = true;
+            btn.textContent = '验证中...';
+
+            try {
+                // 后端要求 GET 请求，参数名为 key
+                const requestUrl = VIP_CONFIG.apiUrl + '?key=' + encodeURIComponent(val);
+
+                const res = await fetch(requestUrl, {
+                    method: VIP_CONFIG.method
+                });
+
+                const data = await res.json(); // 后端返回 JSON 格式
+                const result = VIP_CONFIG.parseResponse(data);
+
+                if (res.ok && result.ok) {
+                    isVIP = true;
+                    localStorage.setItem(VIP_CONFIG.tokenKey, result.token || 'vip-ok');
+                    document.getElementById('vipModal').classList.remove('show');
+                    input.value = '';
+                    initVIPUI();
+                    renderDashboard();
+                    showToast('✅ 卡密验证成功，双期数数据已解锁！', 'success');
+                } else {
+                    showToast('❌ ' + (result.msg || '卡密无效'), 'error');
+                    input.value = '';
+                }
+            } catch (err) {
+                console.error('VIP 验证请求失败:', err);
+                showToast('❌ 网络异常，请稍后重试', 'error');
+            } finally {
+                btn.disabled = false;
+                btn.textContent = oldText;
             }
         }
 
@@ -1248,7 +1311,6 @@
             document.body.removeChild(textArea);
         }
 
-        // ===== 生成回测明细条 =====
         function buildStrip(seq, maxLen = 40) {
             if (!seq || !seq.length) {
                 return '<div style="color:var(--dim);font-size:11px;text-align:center;padding:6px;">暂无回测数据</div>';
@@ -1259,7 +1321,6 @@
                 <div class="backtest-note">最近 ${arr.length} 期：命中 <b>${hits}</b> · 未中 <b>${arr.length - hits}</b>（左旧 → 右新）</div>`;
         }
 
-        // ===== 预测卡数量 =====
         function getCardCount() {
             const active = document.querySelector('.cc-pill.active');
             return active ? parseInt(active.dataset.n) : 1;
@@ -1281,9 +1342,6 @@
             if (arrow) arrow.style.transform = el.classList.contains('open') ? 'rotate(180deg)' : '';
         }
 
-        // ============================================================
-        //  结论预测卡渲染（主卡 + 次级卡）
-        // ============================================================
         function renderConclusionCards() {
             const d = currentReportData;
             if (!d) return;
@@ -1345,14 +1403,12 @@
                 `<span class="conc-tag">${x.title.replace(/剥离$/,'')} <b>${x.val.join(',')}</b></span>`
             ).join('');
 
-            // 主卡回测明细
             concDetailBtn.style.display = 'flex';
             concDetail.innerHTML = buildStrip(primary.stats.seq || [], 50);
             if (concDetail.classList.contains('open')) {
                 document.getElementById('concDetailArrow').style.transform = 'rotate(180deg)';
             }
 
-            // ===== 次级预测卡 =====
             const cardCount = getCardCount();
             const subWrap = document.getElementById('subCardsContainer');
             const subs = d.list.slice(1, cardCount);
@@ -1399,9 +1455,6 @@
             }).join('');
         }
 
-        // ============================================================
-        //  组合过滤核心函数
-        // ============================================================
         function getNumbersForItem(title, val) {
             const nums = new Set();
             if (!val || !val.length) return [];
@@ -1655,9 +1708,6 @@
             applyCombo([]);
         }
 
-        // ============================================================
-        //  分享复制
-        // ============================================================
         function generateShareReport() {
             if (!currentReportData) {
                 showToast('请先执行剥离计算再复制', 'error');
@@ -1667,7 +1717,7 @@
             let text = '';
 
             if (d.locked) {
-                text = `🔒【鹰眼通 AI 演算•大数据】第 ${d.period} 期\n\n系统检测到本期触发核心加密保护机制。\n🔥 高位剥离数据仅限 VIP 专属查看。\n\n👉 升级 VIP 解锁精准杀号与算法模型。\n#鹰眼通AI #量化预测 #数据加密`;
+                text = `🔒【鹰眼通 AI 演算•大数据】第 ${d.period} 期\n\n系统检测到本期为双数期，已触发核心加密保护机制。\n🔥 高位剥离数据仅限 VIP 专属查看。\n\n👉 升级 VIP 解锁精准杀号与算法模型。\n#鹰眼通AI #量化预测 #数据加密`;
                 copyToClipboard(text, '✅ 已复制加密提示');
                 return;
             }
@@ -1691,7 +1741,6 @@
                 cardText += `───────────────\n`;
             });
 
-            // 组合过滤结果
             let comboText = '';
             const comboState = computeComboState();
             if (comboState) {
@@ -1719,9 +1768,6 @@
             copyToClipboard(text, '✅ 完整推文已复制，快去发帖吧！');
         }
 
-        // ============================================================
-        //  数据抓取
-        // ============================================================
         async function startScan() {
             const btn = document.getElementById('btnScan');
             const modal = document.getElementById('calcModal');
@@ -1843,8 +1889,8 @@
         }
 
         function findOptimalParam() {
-            const count = isVIP ? parseInt(document.getElementById('selCount').value) : 1;
-            const strategies = isVIP ? ['miss', 'combo', 'intersect'] : ['miss'];
+            const count = parseInt(document.getElementById('selCount').value) || 1;
+            const strategies = (isVIP || !currentIsEvenPeriod) ? ['miss', 'combo', 'intersect'] : ['miss'];
             
             const maxAvailable = SEQ.length - 10;
             let periods = [50, 100, 200, 300].filter(p => p <= maxAvailable);
@@ -1892,17 +1938,20 @@
             return { bestStrategy, bestPeriod, bestRate: bestRate.toFixed(1) };
         }
 
-        // ============================================================
-        //  主渲染逻辑
-        // ============================================================
         function renderDashboard() {
             if (SEQ.length === 0) return;
 
             comboSelected.clear();
 
-            let strategy = isVIP ? document.getElementById('selStrategy').value : 'miss';
-            let testLen = isVIP ? parseInt(document.getElementById('selPeriod').value) : 50;
-            const count = isVIP ? parseInt(document.getElementById('selCount').value) : 1;
+            const lastPeriodStr = SEQ[SEQ.length - 1].period.toString();
+            const nextPeriodNum = parseInt(lastPeriodStr.replace(/\D/g, '')) + 1;
+            const isEvenPeriod = nextPeriodNum % 2 === 0;
+
+            updateAccessUI(isEvenPeriod);
+
+            let strategy = document.getElementById('selStrategy').value;
+            let testLen = parseInt(document.getElementById('selPeriod').value);
+            const count = parseInt(document.getElementById('selCount').value) || 1;
             
             let isAutoTriggered = false;
 
@@ -1926,10 +1975,7 @@
             if (start < 10) start = 10;
 
             const actualTestLen = SEQ.length - start;
-            const nextPeriodNum = parseInt(SEQ[SEQ.length - 1].period.replace(/\D/g, '')) + 1;
-            const isEvenPeriod = nextPeriodNum % 2 === 0;
 
-            // ===== 统计对象（含回测序列） =====
             const statKeys = ['kz','kt','khead','khalf','ksum','kdoor','kseg','kwuxing','ktailsum','kheadparity','kn5','kn10'];
             const stats = {};
             statKeys.forEach(k => {
@@ -2103,7 +2149,6 @@
                 overlay.classList.remove('show');
             }
 
-            // ===== 12 项明细渲染 =====
             let html = '';
             renderList.forEach((item, idx) => {
                 const rate = parseFloat(getRate(item.stats.hits));
@@ -2149,13 +2194,20 @@
 
             killList.innerHTML = html;
 
-            // ===== 结论卡 + 组合过滤 =====
             renderConclusionCards();
             renderComboRecommendation();
             updateComboResult(true);
+
+            if (locked && !vipPromptShown) {
+                vipPromptShown = true;
+                setTimeout(() => {
+                    if (!isVIP && currentReportData && currentReportData.locked) {
+                        openVIP();
+                    }
+                }, 1000);
+            }
         }
 
-        // ===== 预测卡数量切换 =====
         function initCardCountPills() {
             const pills = document.querySelectorAll('.cc-pill');
             pills.forEach(btn => {
